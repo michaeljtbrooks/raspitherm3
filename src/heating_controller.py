@@ -101,3 +101,8 @@ class HeatingController(BaseRaspiHomeDevice):
         self.ch = value
         return self.status
 
+    def teardown(self):
+        """
+        Called when exiting the listener. Tear down any async threads here
+        """
+        logging.info("\tHeatingController {}: exiting...".format(self.__class__.__name__))
