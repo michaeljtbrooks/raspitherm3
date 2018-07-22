@@ -38,7 +38,7 @@ class HeatingController(BaseRaspiHomeDevice):
         """
         Sets this up
         """
-        self.iface = self.get_or_build_interface(self, config=None, interface=None)
+        self.iface = self.get_or_build_interface(config=config, interface=interface)
         
         # Outputs
         self._HW_TOGGLE_PIN = config.get("hw_toggle_pin", self._HW_TOGGLE_PIN)
@@ -69,7 +69,7 @@ class HeatingController(BaseRaspiHomeDevice):
         """
         Returns the boolean equivalent of the given value
         """
-        if value in ("off","OFF","-","low","0","LOW","L"):
+        if value in ("off", "OFF", "-", "low", "0", "LOW", "L", "False", "false", "None", "null"):
             return 0
         return bool(value)
     
@@ -91,6 +91,13 @@ class HeatingController(BaseRaspiHomeDevice):
         self.write(self._HW_TOGGLE_PIN, value)
         self.hw = value
         return self.status
-        
-    
-    
+
+    def set_ch(self, value):
+        """
+        Turns the hot water to the value of mode
+        """
+        value = self.human_bool(value)
+        self.write(self._CH_TOGGLE_PIN, value)
+        self.ch = value
+        return self.status
+

@@ -24,7 +24,11 @@ try:
 except ImportError:
     #python3
     from urllib.parse import urlencode
-    
+import configparser
+import copy
+import datetime
+import logging
+import json
 import os
 from subprocess import check_output, CalledProcessError
 import time
@@ -32,11 +36,9 @@ from twisted.internet import reactor, endpoints,protocol
 from twisted.web.resource import Resource
 from twisted.web.server import Site, Request
 from twisted.web.static import File
-import json
-import copy
-import logging
-import configparser
-import datetime
+
+from heating_controller import HeatingController
+
 
 APP_NAME="python ./raspitherm_listener.py"
 
@@ -86,6 +88,10 @@ class RaspithermControlResource(Resource):
     """
     isLeaf = False #Allows us to go into dirs
     heating_controller = None #Populated at init
+    PARAM_TO_ACTION_MAPPING = (
+        ("ch", "ch"),
+        ("hw", "hw"),
+    )
     
     def __init__(self, *args, **kwargs):
         """
@@ -128,31 +134,41 @@ class RaspithermControlResource(Resource):
         _action_result = None
         
         #Look through the actions if the request key exists, perform that action
+        return_json = False
         for key_name, action_name in self.PARAM_TO_ACTION_MAPPING:
             if request.has_param(key_name):
                 action_func_name = "action__%s" % action_name
                 _action_result = getattr(self, action_func_name)(request) #Execute that function
+                return_json = True;
                 break
         
         #Read our statuses:
-        if self.heating_controller.hw_state:
+        if self.heating_controller.hw:
             hw_status = "on"
             hw_status_js = 1
+            hw_checked_attr = ' checked="checked"'
         else:
             hw_status = "off"
             hw_status_js = 0
-        if self.heating_controller.ch_state:
+            hw_checked_attr = ""
+        if self.heating_controller.ch:
             ch_status = "on"
             ch_status_js = 1
+            ch_checked_attr = ' checked="checked"'
         else:
             ch_status = "off"
             ch_status_js = 0
+            ch_checked_attr = ""
         
         #Return a JSON object if a result:
-        if _action_result is not None:
+        if _action_result is not None or return_json:
             json_data = {
                 "hw_status_js" : hw_status_js,
-                "ch_status_js" : ch_status_js
+                "ch_status_js" : ch_status_js,
+                "hw_status": hw_status,
+                "ch_status": ch_status,
+                "hw": hw_status,
+                "ch": ch_status,
             }
             try:
                 return json.dumps(json_data)
@@ -168,6 +184,8 @@ class RaspithermControlResource(Resource):
                 hw_status_js=hw_status_js,
                 ch_status=ch_status,
                 ch_status_js=ch_status_js,
+                hw_checked_attr=hw_checked_attr,
+                ch_checked_attr=ch_checked_attr,
             ).encode('utf-8')
     
     def action__hw(self, request):
@@ -200,12 +218,12 @@ class RaspithermControlSite(Site, object):
     Site thread which initialises the RaspithermControlResource properly
     """
     def __init__(self, *args, **kwargs):
-        resource = kwargs.pop("resource",RaspithermControlResource)
+        resource = kwargs.pop("resource", RaspithermControlResource())
         super(RaspithermControlSite, self).__init__(resource=resource, requestFactory=SmartRequest, *args, **kwargs)
     
     def stopFactory(self):
         """
-        Called automatically when exiting the reactor. Here we tell the LEDstrip to tear down its resources
+        Called automatically when exiting the reactor. Here we tell the HeatingController class to tear down its resources
         """
         self.resource.teardown()
     
@@ -218,7 +236,7 @@ def start_if_not_running():
     pids = get_matching_pids(APP_NAME, exclude_self=True) #Will remove own PID
     pids = filter(bool,pids)
     if not pids: #No match! Implies we need to fire up the listener
-        logging.info("[STARTING] Raspitherm Listener with PID {}".format(os.getpid))
+        logging.info("[STARTING] Raspitherm Listener with PID {}".format(os.getpid()))
     
         factory = RaspithermControlSite(timeout=8) #8s timeout
         endpoint = endpoints.TCP4ServerEndpoint(reactor, CONFIG_SETTINGS['pi_port'])

@@ -1,0 +1,110 @@
+/* Raspiled - CSS */
+
+body {
+	font-family: "Trebuchet MS", "Trebuchet", Arial, Helvetica, "Liberation Sans", "Sans", sans-serif;
+    font-size: 10pt;
+    font-size: 1.0rem;
+    background: #f8f8f8;
+}
+h1, h2, h3, h4 {
+	font-family: Palatino, "Palatino Linotype", "Book Antiqua", "Hoefler Text", Georgia, "Lucida Bright", Cambria, Times, "Times New Roman", serif;
+}
+div#raspiled-color-picker svg{
+    margin: 0px auto;
+}
+div.colour-status{
+    text-align: center;
+    width: 16em;
+    margin: 0.5em auto;
+    font-family: Palatino, "Palatino Linotype", "Book Antiqua", "Hoefler Text", Georgia, "Lucida Bright", Cambria, Times, "Times New Roman", serif;
+    font-size: 1.6rem;
+}
+
+a{
+	text-decoration: none;
+}
+.preset_button{
+	display: inline-block;
+	padding: 0.5em 1.0em;
+	margin-right: 0.2em;
+	margin-bottom: 0.5em;
+}
+
+.button_selected{
+    border: 3px solid #202020;
+}
+.button_error{
+    border: 3px solid #CC0000;
+}
+
+
+/* The switch - the box around the slider */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 240px;
+  height: 136px;
+}
+
+/* Hide default HTML checkbox */
+.switch input {display:none;}
+
+/* The slider */
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  -webkit-transition: .4s;
+  transition: .4s;
+  -moz-box-shadow: inset 5px 5px 5px rgba(0,0,0,0.2);
+  -webkit-box-shadow: inset 5px 5px 5px rgba(0,0,0,0.2);
+  box-shadow: inset 5px 5px 5px rgba(0,0,0,0.2);
+
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 104px;
+  width: 104px;
+  left: 16px;
+  bottom: 16px;
+  background-color: white;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+input:checked + .slider {
+  background-color: #D80027;
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px #D80027;
+}
+
+input:checked + .slider:before {
+  -webkit-transform: translateX(104px);
+  -ms-transform: translateX(104px);
+  transform: translateX(104px);
+}
+
+/* Rounded sliders */
+.slider.round {
+  border-radius: 136px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}
+
+
+.logo img{
+    max-width: 50%;
+    max-height:50px;
+    margin-left:15px;
+    margin-right:15px;
+}

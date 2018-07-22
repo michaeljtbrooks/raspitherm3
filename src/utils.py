@@ -91,13 +91,14 @@ class SmartRequest(Request, object):
         @keyword default: The default value to return if we cannot get a valid value
         @keyword force: <type> A class / type to force the output into. Default is returned if we cannot force the value into this type 
         """
+        val = NOT_SET
         if isinstance(names,(str, unicode)):
             names = [names]
         for name in names:
             val = self.get_param_values(name=name, default=NOT_SET)
-            if val is not NOT_SET: #Once we find a valid value, continue
+            if val is not NOT_SET:  # Once we find a valid value, continue
                 break
-        #If we have no valid value, then bail
+        # If we have no valid value, then bail
         if val is NOT_SET:
             return default
         try:
@@ -127,8 +128,13 @@ class SmartRequest(Request, object):
             except KeyError:
                 pass
         return False
-    has_param = has_params
-    has_key = has_params
+
+    def has_param(self, param_name):
+        """
+        Returns True or the value if the param exists
+        """
+        return self.has_params(param_name)
+    has_key = has_param
     
     def __getitem__(self, name):
         """
@@ -158,7 +164,13 @@ class PiPinInterface(pigpio.pi, object):
         return "RaspberryPi Pins @ {ipv4}:{port}... {status}".format(ipv4=self._host, port=self._port, status=status)
     
     def __repr__(self):
-        return str(self.__unicode__()) 
+        return str(self.__unicode__())
+
+    def get_port(self):
+        """
+        :return: port number
+        """
+        return self._port
 
 
 class BaseRaspiHomeDevice(object):
@@ -229,14 +241,14 @@ class BaseRaspiHomeDevice(object):
                 need_to_generate_new_interface = True
                 logging.info("iface host different to intended: iface=%s vs pi=%s" % (iface_host, pi_host))
             try:
-                iface_port = interface._port
+                iface_port = interface.get_port()
             except AttributeError:
                 iface_port = None
-                logging.info("iface port different to intended: iface=%s vs pi=%s" % (iface_port, pig_port))
             if iface_port is None:
                 need_to_generate_new_interface = True
             elif pig_port and unicode(pig_port) != unicode(iface_port):
                 need_to_generate_new_interface = True
+                logging.info("iface port different to intended: iface=%s vs pi=%s" % (iface_port, pig_port))
             try:
                 iface_connected = interface.connected
             except AttributeError:
@@ -275,18 +287,18 @@ def get_matching_pids(name, exclude_self=True):
     
     @return: <list [<str>,]> List of PIDs 
     """
-    #Get all matching PIDs
+    # Get all matching PIDs
     try:
         pids_str = subprocess.check_output(["pidof",name])
-    except subprocess.CalledProcessError: #No matches
+    except subprocess.CalledProcessError:  # No matches
         pids_str = ""
-    #Process string-list into python list
+    # Process string-list into python list
     pids = pids_str.strip().split(" ")
-    #Remove self if required:
+    # Remove self if required:
     if exclude_self:
-        my_pid = str(os.getpid()) #Own PID - getpid() returns integer
+        my_pid = str(os.getpid())  # Own PID - getpid() returns integer
         try:
-            pids.remove(my_pid)  #Remove my PID string:
+            pids.remove(my_pid)  # Remove my PID string:
         except ValueError:
             pass
     return pids

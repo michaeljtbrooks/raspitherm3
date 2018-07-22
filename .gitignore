@@ -1,2 +1,8 @@
 /.project
 /.pydevproject
+/bin
+/include
+/lib
+/local
+/share
+/pip-selfcheck.json
