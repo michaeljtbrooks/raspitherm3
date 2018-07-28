@@ -18,8 +18,9 @@ Raspitherm is a Python based controller for heating programmers. It allows you t
 5. 4 x optoisolator gates
 5. Prototyping matrix board / PCBs
 6. 5V DC power supply to drive the Raspberry Pi
-10. [Pigpio](http://abyz.me.uk/rpi/pigpio/index.html) to provide you with software pulse width modulation
-11. (optional) 2 x 100k pull-down resistors 
+7. [Pigpio](http://abyz.me.uk/rpi/pigpio/index.html) to provide you with software pulse width modulation
+8. 2 x 100R (one hundred ohm) current limiting resistors for input channel optoisolator LEDs
+9. 4 x 47k pull-down resistors 
 
 
 ### Hardware circuitry ###
