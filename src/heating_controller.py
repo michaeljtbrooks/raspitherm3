@@ -63,6 +63,9 @@ class HeatingController(BaseRaspiHomeDevice):
                 print("ERROR: Cannot configure pins hw={},{} ch={},{}: {}".format(self._HW_TOGGLE_PIN, self._HW_STATUS_PIN, self._CH_TOGGLE_PIN, self._CH_STATUS_PIN, e))
         else:
             print("ERROR: Interface not connected. Cannot configure pins.")
+            
+        # Now set internal vars to initial state:
+        self.check_status()
     
     @classmethod
     def human_bool(cls, value):
@@ -83,26 +86,51 @@ class HeatingController(BaseRaspiHomeDevice):
             "ch": self.ch
         }
     
+    def check_hw(self):
+        """
+        Interrogates the HW pin. Returns the current status of the Hot Water
+        """
+        self.hw = self.read(self._HW_STATUS_PIN)
+        return self.hw
+    
+    def check_ch(self):
+        """
+        Interrogates the CH pin. Returns the current status of the Central Heating
+        """
+        self.ch = self.read(self._CH_STATUS_PIN)
+        return self.ch
+    
+    def check_status(self):
+        """
+        Interrogates both CH and HW pins, returning the statuses of the pins and 
+        setting the internal pointers to those values
+        """
+        self.check_ch()
+        self.check_hw()
+        return self.status    
+    
     def set_hw(self, value):
         """
-        Turns the hot water to the value of mode
+        Turns the hot water to the value of mode. This involves a transient 75ms pulse to the 
+        toggle pin.
         """
-        value = self.human_bool(value)
-        self.write(self._HW_TOGGLE_PIN, value)
-        self.hw = value
-        return self.status
+        current_value = self.check_hw()
+        intended_value = self.human_bool(value)
+        self.pulse_if_different(current=current_value, intended=intended_value, output_pin=self._HW_TOGGLE_PIN)
+        return self.check_status()  # Actually measure the result!
 
     def set_ch(self, value):
         """
         Turns the hot water to the value of mode
         """
-        value = self.human_bool(value)
-        self.write(self._CH_TOGGLE_PIN, value)
-        self.ch = value
-        return self.status
+        current_value = self.check_ch()
+        intended_value = self.human_bool(value)
+        self.pulse_if_different(current=current_value, intended=intended_value, output_pin=self._CH_TOGGLE_PIN)
+        return self.check_status()  # Actually measure the result!
 
     def teardown(self):
         """
         Called when exiting the listener. Tear down any async threads here
         """
         logging.info("\tHeatingController {}: exiting...".format(self.__class__.__name__))
+    

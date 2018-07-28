@@ -143,6 +143,7 @@ class RaspithermControlResource(Resource):
                 break
         
         #Read our statuses:
+        self.heating_controller.check_status()  # Actually reads from the pins and updates internal vars
         if self.heating_controller.hw:
             hw_status = "on"
             hw_status_js = 1

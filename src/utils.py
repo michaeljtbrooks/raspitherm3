@@ -10,6 +10,7 @@ import pigpio
 import os
 import logging
 import subprocess
+from time import sleep
 from twisted.web.server import Request
 
 logging.basicConfig(format='[%(asctime)s RASPIhome] %(message)s',
@@ -210,6 +211,29 @@ class BaseRaspiHomeDevice(object):
         else:
             logging.error("ERROR: Interface not connected. Cannot read value of pin #%s." % (pin,))
         return value
+    
+    def pulse_on(self, pin, duration_ms=75):
+        """
+        Pulses the given pin on for a short period.
+        NB: This is BLOCKING for the duration. Run in a thread if the duration is long.
+        
+        @param pin: <int> The pin to change
+        @keyword duration: <int> How long the pulse should be in ms
+        """
+        self.write(pin, 1)
+        sleep(duration_ms/1000.0)
+        self.write(pin, 0)
+        return duration_ms
+    
+    def pulse_if_different(self, current=None, intended=None, output_pin=None, duration_ms=75):
+        """
+        Pulses the given pin only if the current and intended values are different in the boolean sense
+        i.e. if current XOR intended, send pulse
+        """
+        if current is None or intended is None or output_pin is None:
+            logging.error("ERROR - pulse_if_different(): All parameters must be provided and not None. current={} intended={} output_pin={}".format(current, intended, output_pin))
+        if bool(current) ^ bool(intended):
+            self.pulse_on(output_pin, duration_ms)
     
     def get_or_build_interface(self, config=None, interface=None, *args, **kwargs):
         """
