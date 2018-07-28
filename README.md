@@ -20,7 +20,8 @@ Raspitherm is a Python based controller for heating programmers. It allows you t
 6. 5V DC power supply to drive the Raspberry Pi
 7. [Pigpio](http://abyz.me.uk/rpi/pigpio/index.html) to provide you with software pulse width modulation
 8. 2 x 100R (one hundred ohm) current limiting resistors for input channel optoisolator LEDs
-9. 4 x 47k pull-down resistors 
+9. 2 x 500R (five hundred ohm) current limiting resistors for output channel optoisolators
+10. 4 x 47k pull-down resistors 
 
 
 ### Hardware circuitry ###
@@ -111,4 +112,4 @@ Here are some ideas for improvements:
 #### With thanks to ####
 * Josue-Martinez-Moreno for contributing better logging and the config file architecture.
 * Danfoss for putting handy test pads on their PCBs making tapping the board easy
-
+* Ant323d for his [YouTube video showing how to tap a Danfoss heating programmer](https://www.youtube.com/watch?v=Guhf7eohl98)!
