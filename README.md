@@ -2,7 +2,7 @@
 
 Raspberry Pi controlled hot water / central heating
 
-(screenshots to follow)
+![Raspitherm Web Interface](https://github.com/michaeljtbrooks/raspitherm/blob/master/docs/raspitherm_ui.png)
 
 ### What is this? ###
 Raspitherm is a Python based controller for heating programmers. It allows you to turn your hot water and central heating on and off, via a very easy to use touch-friendly web interface.
@@ -23,7 +23,9 @@ Raspitherm is a Python based controller for heating programmers. It allows you t
 
 
 ### Hardware circuitry ###
-I'll post a circuit up soon.
+Here's the circuit I used to connect to my Danfoss FP715S controller:
+
+![Raspitherm Interface Circuit](https://github.com/michaeljtbrooks/raspitherm/blob/master/docs/Danfoss_RaspberryPi_interface_circuit.png)
 
 Broadly speaking you have two input channels, and two output channels, each operating via an optoisolator to keep the Raspberry Pi and heating programmer separate.
 
