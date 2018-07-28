@@ -56,6 +56,7 @@ DEFAULTS = {
         'cw_toggle_pin': 26,
         'hw_status_pin': 22,
         'cw_status_pin': 27,
+        'pulse_duration_ms': 200,  # Duration of pulse
     }
 
 # Generate or read a config file.

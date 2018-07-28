@@ -212,7 +212,7 @@ class BaseRaspiHomeDevice(object):
             logging.error("ERROR: Interface not connected. Cannot read value of pin #%s." % (pin,))
         return value
     
-    def pulse_on(self, pin, duration_ms=75):
+    def pulse_on(self, pin, duration_ms=100):
         """
         Pulses the given pin on for a short period.
         NB: This is BLOCKING for the duration. Run in a thread if the duration is long.
@@ -225,7 +225,7 @@ class BaseRaspiHomeDevice(object):
         self.write(pin, 0)
         return duration_ms
     
-    def pulse_if_different(self, current=None, intended=None, output_pin=None, duration_ms=75):
+    def pulse_if_different(self, current=None, intended=None, output_pin=None, duration_ms=100):
         """
         Pulses the given pin only if the current and intended values are different in the boolean sense
         i.e. if current XOR intended, send pulse

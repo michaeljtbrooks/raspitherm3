@@ -33,6 +33,7 @@ class HeatingController(BaseRaspiHomeDevice):
     _CH_TOGGLE_PIN = 26
     _HW_STATUS_PIN = 22
     _CH_STATUS_PIN = 27
+    _PULSE_DURATION_MS = 200  # How long a toggle pulse should be (milliseconds
     
     def __init__(self, config, interface=None):
         """
@@ -43,6 +44,7 @@ class HeatingController(BaseRaspiHomeDevice):
         # Outputs
         self._HW_TOGGLE_PIN = config.get("hw_toggle_pin", self._HW_TOGGLE_PIN)
         self._CH_TOGGLE_PIN = config.get("ch_toggle_pin", self._CH_TOGGLE_PIN)
+        self._PULSE_DURATION_MS = config.get("pulse_duration_ms", self._PULSE_DURATION_MS)
         
         # Inputs
         self._HW_STATUS_PIN = config.get("hw_status_pin", self._HW_STATUS_PIN)
@@ -116,7 +118,7 @@ class HeatingController(BaseRaspiHomeDevice):
         """
         current_value = self.check_hw()
         intended_value = self.human_bool(value)
-        self.pulse_if_different(current=current_value, intended=intended_value, output_pin=self._HW_TOGGLE_PIN)
+        self.pulse_if_different(current=current_value, intended=intended_value, output_pin=self._HW_TOGGLE_PIN, duration_ms=self._PULSE_DURATION_MS)
         return self.check_status()  # Actually measure the result!
 
     def set_ch(self, value):
@@ -125,7 +127,7 @@ class HeatingController(BaseRaspiHomeDevice):
         """
         current_value = self.check_ch()
         intended_value = self.human_bool(value)
-        self.pulse_if_different(current=current_value, intended=intended_value, output_pin=self._CH_TOGGLE_PIN)
+        self.pulse_if_different(current=current_value, intended=intended_value, output_pin=self._CH_TOGGLE_PIN, duration_ms=self._PULSE_DURATION_MS)
         return self.check_status()  # Actually measure the result!
 
     def teardown(self):
