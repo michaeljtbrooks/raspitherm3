@@ -57,6 +57,7 @@ DEFAULTS = {
         'hw_status_pin': 22,
         'cw_status_pin': 27,
         'pulse_duration_ms': 200,  # Duration of pulse
+        'relay_delay_ms': 200,  # How long it takes for the relays to be thrown
     }
 
 # Generate or read a config file.

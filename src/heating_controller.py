@@ -15,6 +15,7 @@ from __future__ import unicode_literals
 
 import logging
 import pigpio
+from time import sleep
 from utils import BaseRaspiHomeDevice
 
 logging.basicConfig(format='[%(asctime)s RASPITHERM] %(message)s', datefmt='%H:%M:%S',level=logging.INFO)
@@ -33,7 +34,8 @@ class HeatingController(BaseRaspiHomeDevice):
     _CH_TOGGLE_PIN = 26
     _HW_STATUS_PIN = 22
     _CH_STATUS_PIN = 27
-    _PULSE_DURATION_MS = 200  # How long a toggle pulse should be (milliseconds
+    _PULSE_DURATION_MS = 200  # How long a toggle pulse should be (milliseconds)
+    _RELAY_DELAY_MS = 200  # How long to wait before rechecking the status after a toggle (enough time for relay to switch) 
     
     def __init__(self, config, interface=None):
         """
@@ -49,6 +51,7 @@ class HeatingController(BaseRaspiHomeDevice):
         # Inputs
         self._HW_STATUS_PIN = config.get("hw_status_pin", self._HW_STATUS_PIN)
         self._CH_STATUS_PIN = config.get("ch_status_pin", self._CH_STATUS_PIN)
+        self._RELAY_DELAY_MS = config.get("relay_delay_ms", self._RELAY_DELAY_MS)
         
         # Configure pins (we are using hardware pull-down resistors, so turn the internals off):
         if self.iface.connected:
@@ -119,6 +122,7 @@ class HeatingController(BaseRaspiHomeDevice):
         current_value = self.check_hw()
         intended_value = self.human_bool(value)
         self.pulse_if_different(current=current_value, intended=intended_value, output_pin=self._HW_TOGGLE_PIN, duration_ms=self._PULSE_DURATION_MS)
+        sleep(self._RELAY_DELAY_MS/1000.0)
         return self.check_status()  # Actually measure the result!
 
     def set_ch(self, value):
@@ -128,6 +132,7 @@ class HeatingController(BaseRaspiHomeDevice):
         current_value = self.check_ch()
         intended_value = self.human_bool(value)
         self.pulse_if_different(current=current_value, intended=intended_value, output_pin=self._CH_TOGGLE_PIN, duration_ms=self._PULSE_DURATION_MS)
+        sleep(self._RELAY_DELAY_MS/1000.0)
         return self.check_status()  # Actually measure the result!
 
     def teardown(self):
