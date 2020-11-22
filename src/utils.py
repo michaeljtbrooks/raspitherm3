@@ -11,6 +11,8 @@ import os
 import logging
 import subprocess
 from time import sleep
+
+from pigpio_dht import DHT11, DHT22
 from twisted.web.server import Request
 
 
@@ -42,7 +44,7 @@ def pigpiod_process():
     output, _error = process.communicate()
 
     if output=='':
-        logging.warn('*** [STARTING PIGPIOD] i.e. "sudo pigpiod" ***') 
+        logging.warning('*** [STARTING PIGPIOD] i.e. "sudo pigpiod" ***')
         cmd='sudo pigpiod'
         process = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
         output, _error = process.communicate()
@@ -173,6 +175,20 @@ class PiPinInterface(pigpio.pi, object):
         :return: port number
         """
         return self._port
+
+    def add_supplementary_pin_interface(self, pin_id=None, name=None, interface_class=None, *args, **kwargs):
+        """
+        Adds the supplementary interface to this instance object. Useful for when using other libraries to add
+        stuff in
+        """
+        if interface_class is None:
+            logging.warning('PiPinInterface.add_supplementary_pin_interface(): No pin_id provided. Interface ignored.')
+            return None
+        if name is None:
+            name = str(interface_class.__name__).lower()
+        supplementary_interface = interface_class(pin_id, *args, **kwargs)
+        setattr(self, name, supplementary_interface)
+        return supplementary_interface
 
 
 class BaseRaspiHomeDevice(object):
