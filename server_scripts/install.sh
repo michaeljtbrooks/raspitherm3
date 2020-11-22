@@ -47,7 +47,7 @@ cp /opt/raspitherm/server_scripts/etc/rc.local /etc/rc.local
 
 echo "  Starting Raspitherm server..."
 sudo pigpiod
-sudo /opt/raspitherm/bin/python /opt/raspitherm/src/raspitherm_listener.py
+sudo /opt/raspitherm/env/bin/python /opt/raspitherm/src/raspitherm_listener.py
 
 echo "Installation complete! Raspitherm is now running!"
 exit 0

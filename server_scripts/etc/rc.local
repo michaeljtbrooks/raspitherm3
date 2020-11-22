@@ -23,6 +23,6 @@ printf "Starting pigpio daemon..."
 sudo pigpiod
 
 # Start RaspiTherm
-/opt/raspitherm/bin/python /opt/raspitherm/src/raspitherm_listener.py
+/opt/raspitherm/env/bin/python /opt/raspitherm/src/raspitherm_listener.py
 
 exit 0
