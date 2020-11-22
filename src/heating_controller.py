@@ -12,11 +12,10 @@
     The actual Raspberry Pi controller class wrapper
 """
 
-
 import logging
 import pigpio
 from time import sleep
-from .utils import BaseRaspiHomeDevice
+from utils import BaseRaspiHomeDevice
 
 logging.basicConfig(format='[%(asctime)s RASPITHERM] %(message)s', datefmt='%H:%M:%S',level=logging.INFO)
 

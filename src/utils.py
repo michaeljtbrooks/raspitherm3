@@ -13,22 +13,23 @@ import subprocess
 from time import sleep
 from twisted.web.server import Request
 
-logging.basicConfig(format='[%(asctime)s RASPIhome] %(message)s',
-                            datefmt='%H:%M:%S',level=logging.INFO)
 
-def Odict2int(ODict):
-    '''
+logging.basicConfig(format='[%(asctime)s RASPIhome] %(message)s', datefmt='%H:%M:%S',level=logging.INFO)
+
+
+def odict2int(ordered_dict):
+    """
     Converts an OrderedDict with unicode values to integers (port and pins).
     @param Odict: <OrderedDict> containg RASPILED configuration.
 
     @returns: <OrderedDict> with integers instead of unicode values.
-    '''
-    for key,value in list(ODict.items()):
+    """
+    for key, value in list(ordered_dict.items()):
         try:
-            ODict[key]=int(value)
+            ordered_dict[key] = int(value)
         except ValueError:
-            ODict[key]=value
-    return ODict
+            ordered_dict[key] = value
+    return ordered_dict
 
 
 def pigpiod_process():

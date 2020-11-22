@@ -16,7 +16,7 @@
         @requires: twisted
 """
 
-from .utils import Odict2int, SmartRequest, get_matching_pids
+from utils import odict2int, SmartRequest, get_matching_pids
 
 try:
     #python2
@@ -37,13 +37,12 @@ from twisted.web.resource import Resource
 from twisted.web.server import Site, Request
 from twisted.web.static import File
 
-from .heating_controller import HeatingController
+from heating_controller import HeatingController
 
 
-APP_NAME="python ./raspitherm_listener.py"
+APP_NAME = "python ./raspitherm_listener.py"
 
-logging.basicConfig(format='[%(asctime)s RASPITHERM] %(message)s',
-                            datefmt='%H:%M:%S',level=logging.INFO)
+logging.basicConfig(format='[%(asctime)s RASPITHERM] %(message)s', datefmt='%H:%M:%S',level=logging.INFO)
 
 RASPILED_DIR = os.path.dirname(os.path.realpath(__file__)) #The directory we're running in
 
@@ -73,10 +72,11 @@ else:
     parser = configparser.ConfigParser(defaults=DEFAULTS)
     with open(config_path, 'w') as f:
         parser.write(f)
-CONFIG_SETTINGS = Odict2int(parser.defaults()) #Turn the Config file into settings
+CONFIG_SETTINGS = odict2int(parser.defaults()) #Turn the Config file into settings
 
 
 DEBUG = False
+
 
 def D(item):
     if DEBUG:
@@ -102,8 +102,8 @@ class RaspithermControlResource(Resource):
         self.heating_controller = HeatingController(CONFIG_SETTINGS)
         Resource.__init__(self, *args, **kwargs) #Super
         #Add in the static folder
-        static_folder = os.path.join(RASPILED_DIR,"static")
-        self.putChild("static", File(static_folder))
+        static_folder = os.path.join(RASPILED_DIR, "static")
+        self.putChild(b"static", File(static_folder))  # Path must be a bytestring!
     
     def getChild(self, path, request, *args, **kwargs):
         """
@@ -166,8 +166,8 @@ class RaspithermControlResource(Resource):
         #Return a JSON object if a result:
         if _action_result is not None or return_json:
             json_data = {
-                "hw_status_js" : hw_status_js,
-                "ch_status_js" : ch_status_js,
+                "hw_status_js": hw_status_js,
+                "ch_status_js": ch_status_js,
                 "hw_status": hw_status,
                 "ch_status": ch_status,
                 "hw": hw_status,
@@ -248,6 +248,6 @@ def start_if_not_running():
         logging.info("Rasptherm Listener already running with PID %s" % ", ".join(pids))
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     start_if_not_running()
 

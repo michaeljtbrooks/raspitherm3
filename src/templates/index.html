@@ -17,15 +17,15 @@
     <body>
 
         <div class="logo">
-            <img src="./static/figs/raspitherm.svg">
+            <img src="/static/figs/raspitherm.svg">
         </div>
 
         <div id="controls" class="controls">
 
             <div id="central_heating" class="row" data-status="{ch_status}">
                 <div id="central_heating_icon" class="icon">
-                    <img id="central_heating_icon_on" class="icon_off" src="./static/figs/central_heating_off.svg" title="Central heating off">
-                    <img id="central_heating_icon_off" class="icon_on" src="./static/figs/central_heating_on.svg" style="display: none;" title="Central heating ON">
+                    <img id="central_heating_icon_on" class="icon_off" src="/static/figs/central_heating_off.svg" title="Central heating off">
+                    <img id="central_heating_icon_off" class="icon_on" src="/static/figs/central_heating_on.svg" style="display: none;" title="Central heating ON">
                 </div>
                 <label id="central_heating_toggle" class="toggle switch">
                     <input class="toggle_checkbox" type="checkbox" data-keyname="ch" {ch_checked_attr}>
@@ -35,8 +35,8 @@
 
             <div id="hot_water" class="row" data-status="{hw_status}">
                 <div id="hot_water_icon" class="icon">
-                    <img id="hot_water_icon_on" class="icon_off" src="./static/figs/hot_water_off.svg" title="Hot water off">
-                    <img id="hot_water_icon_off" class="icon_on" src="./static/figs/hot_water_on.svg" style="display: none;" title="Hot water ON">
+                    <img id="hot_water_icon_on" class="icon_off" src="/static/figs/hot_water_off.svg" title="Hot water off">
+                    <img id="hot_water_icon_off" class="icon_on" src="/static/figs/hot_water_on.svg" style="display: none;" title="Hot water ON">
                 </div>
                 <label id="hot_water_toggle" class="toggle switch">
                     <input class="toggle_checkbox" type="checkbox" data-keyname="hw" {hw_checked_attr}>
