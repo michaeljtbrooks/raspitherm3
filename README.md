@@ -2,7 +2,7 @@
 
 Raspberry Pi controlled hot water / central heating
 
-![Raspitherm Web Interface](https://github.com/michaeljtbrooks/raspitherm/blob/master/docs/raspitherm_ui.png)
+![Raspitherm Web Interface](https://github.com/michaeljtbrooks/raspitherm3/blob/master/docs/raspitherm_ui.png)
 
 ### What is this? ###
 Raspitherm is a Python based controller for heating programmers. It allows you to turn your hot water and central heating on and off, via a very easy to use touch-friendly web interface.
@@ -27,7 +27,7 @@ Raspitherm is a Python based controller for heating programmers. It allows you t
 ### Hardware circuitry ###
 Here's the circuit I used to connect to my Danfoss FP715S controller:
 
-![Raspitherm Interface Circuit](https://github.com/michaeljtbrooks/raspitherm/blob/master/docs/Danfoss_RaspberryPi_interface_circuit.png)
+![Raspitherm Interface Circuit](https://github.com/michaeljtbrooks/raspitherm3/blob/master/docs/Danfoss_RaspberryPi_interface_circuit.png)
 
 Broadly speaking you have two input channels, and two output channels, each operating via an optoisolator to keep the Raspberry Pi and heating programmer separate.
 
@@ -37,10 +37,21 @@ Each output channel is emulating a button press. It switches an optoisolator on 
 Therefore you need a heating programmer that has indicator LEDs, and manual on/off toggle buttons. You need to tap the programmer's PCB.
 
 
-### Software Installation ###
+### Software Installation - automatic ###
+1. Become root
+```sudo su
+```
+2. Run the install.sh server script
+```
+chmod +x ./server_scripts/install.sh
+./server_scripts/install.sh
+```
+
+
+### Software Installation - manual ###
 1. Get Raspian or Ubuntu running on your Raspberry Pi, with network connectivity working, and install essential packages:
 ```bash
-sudo apt-get install build-essential unzip wget git
+sudo apt-get install build-essential unzip wget git python-setuptools python3-setuptools
 ```
 2. Install pigpio (see http://abyz.me.uk/rpi/pigpio/download.html)
 ```bash
@@ -54,13 +65,13 @@ sudo make install
 4. SSH into your Raspberry Pi. Change to the directory where you saved this repo
 5. Install python virtual environments
 ```bash
-sudo apt-get install python-pip 
-sudo pip install virtualenv
+sudo apt-get install python-pip3
+sudo pip3 install virtualenv
 ```
 6. Create a virtual environment to run Raspiled in, and activate it
 ```bash
-virtualenv ./
-source ./bin/activate
+python3 -m venv ./env
+source ./env/bin/activate
 ```
 7. Install this repo's dependencies (may take 1- mins on a Raspberry Pi
 ```bash

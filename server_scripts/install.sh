@@ -7,6 +7,9 @@ if [ "$EUID" -ne 0 ]
   exit 1
 fi
 
+echo "  Installing prerequisites..."
+sudo apt-get install build-essential unzip wget
+
 echo "  Installing Python..."
 sudo apt-get install python-dev python3-dev
 sudo apt-get install python-setuptools python3-setuptools
