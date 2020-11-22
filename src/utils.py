@@ -82,11 +82,13 @@ class SmartRequest(Request, object):
         
         @return: ["val1","val2"] LIST of arguments, or the default
         """
+        print(self.args)
         try:
             return self.args[name]
         except KeyError:
+            name_as_bytestring = bytes(name, encoding="utf-8", errors="ignore")
             try:
-                return self.args[bytes(name, encoding="utf-8", errors="ignore")]
+                return self.args[name_as_bytestring]
             except KeyError:
                 pass
         return default
@@ -103,10 +105,8 @@ class SmartRequest(Request, object):
         @keyword force: <type> A class / type to force the output into. Default is returned if we cannot force the value into this type 
         """
         val = NOT_SET
-        if isinstance(names, str):
+        if isinstance(names, (str, bytes)):
             names = [names]
-        if isinstance(names, bytes):
-            names = [str(names)]
         for name in names:
             val = self.get_param_values(name=name, default=NOT_SET)
             if val is not NOT_SET:  # Once we find a valid value, continue
@@ -118,6 +118,11 @@ class SmartRequest(Request, object):
             if len(val) == 1:
                 single_val = val[0]
                 if force is not None:
+                    if force == str:
+                        try:
+                            return single_val.decode(encoding="utf-8", errors="unicode_escape")
+                        except (UnicodeError, AttributeError):
+                            return str(single_val)
                     return force(single_val)
                 return single_val
             else:

@@ -92,7 +92,8 @@ class HeatingController(BaseRaspiHomeDevice):
         """
         Returns the boolean equivalent of the given value
         """
-        if str(value) in ("off", "OFF", "-", "low", "0", "LOW", "L", "False", "false", "None", "null"):
+        if value in ("off", "OFF", "-", "low", "0", "LOW", "L", "False", "false", "None", "null",
+                     b"off", b"OFF", b"-", b"low", b"0", b"LOW", b"L", b"False", b"false", b"None", b"null"):
             return 0
         return bool(value)
     
