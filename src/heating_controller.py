@@ -11,12 +11,12 @@
 
     The actual Raspberry Pi controller class wrapper
 """
-from __future__ import unicode_literals
+
 
 import logging
 import pigpio
 from time import sleep
-from utils import BaseRaspiHomeDevice
+from .utils import BaseRaspiHomeDevice
 
 logging.basicConfig(format='[%(asctime)s RASPITHERM] %(message)s', datefmt='%H:%M:%S',level=logging.INFO)
 
@@ -65,7 +65,7 @@ class HeatingController(BaseRaspiHomeDevice):
                 self.iface.set_pull_up_down(self._HW_STATUS_PIN, pigpio.PUD_OFF)
                 self.iface.set_pull_up_down(self._CH_STATUS_PIN, pigpio.PUD_OFF)
             except (AttributeError, IOError, pigpio.error) as e:
-                print("ERROR: Cannot configure pins hw={},{} ch={},{}: {}".format(self._HW_TOGGLE_PIN, self._HW_STATUS_PIN, self._CH_TOGGLE_PIN, self._CH_STATUS_PIN, e))
+                print(("ERROR: Cannot configure pins hw={},{} ch={},{}: {}".format(self._HW_TOGGLE_PIN, self._HW_STATUS_PIN, self._CH_TOGGLE_PIN, self._CH_STATUS_PIN, e)))
         else:
             print("ERROR: Interface not connected. Cannot configure pins.")
             

@@ -7,3 +7,9 @@
 /share
 /pip-selfcheck.json
 /.settings
+/env
+/venv
+/.env
+/.venv
+/.idea
+/.settings/

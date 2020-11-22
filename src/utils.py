@@ -5,7 +5,7 @@
     
     Useful functions
 """
-from __future__ import unicode_literals
+
 import pigpio
 import os
 import logging
@@ -23,7 +23,7 @@ def Odict2int(ODict):
 
     @returns: <OrderedDict> with integers instead of unicode values.
     '''
-    for key,value in ODict.items():
+    for key,value in list(ODict.items()):
         try:
             ODict[key]=int(value)
         except ValueError:
@@ -93,7 +93,7 @@ class SmartRequest(Request, object):
         @keyword force: <type> A class / type to force the output into. Default is returned if we cannot force the value into this type 
         """
         val = NOT_SET
-        if isinstance(names,(str, unicode)):
+        if isinstance(names,str):
             names = [names]
         for name in names:
             val = self.get_param_values(name=name, default=NOT_SET)
@@ -261,7 +261,7 @@ class BaseRaspiHomeDevice(object):
             if iface_host is None:
                 need_to_generate_new_interface = True
                 logging.info("No existing iface host")
-            elif pi_host and unicode(pi_host) != unicode(iface_host):
+            elif pi_host and str(pi_host) != str(iface_host):
                 need_to_generate_new_interface = True
                 logging.info("iface host different to intended: iface=%s vs pi=%s" % (iface_host, pi_host))
             try:
@@ -270,7 +270,7 @@ class BaseRaspiHomeDevice(object):
                 iface_port = None
             if iface_port is None:
                 need_to_generate_new_interface = True
-            elif pig_port and unicode(pig_port) != unicode(iface_port):
+            elif pig_port and str(pig_port) != str(iface_port):
                 need_to_generate_new_interface = True
                 logging.info("iface port different to intended: iface=%s vs pi=%s" % (iface_port, pig_port))
             try:

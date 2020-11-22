@@ -15,12 +15,12 @@
     
         @requires: twisted
 """
-from __future__ import unicode_literals
-from utils import Odict2int, SmartRequest, get_matching_pids
+
+from .utils import Odict2int, SmartRequest, get_matching_pids
 
 try:
     #python2
-    from urllib import urlencode
+    from urllib.parse import urlencode
 except ImportError:
     #python3
     from urllib.parse import urlencode
@@ -37,7 +37,7 @@ from twisted.web.resource import Resource
 from twisted.web.server import Site, Request
 from twisted.web.static import File
 
-from heating_controller import HeatingController
+from .heating_controller import HeatingController
 
 
 APP_NAME="python ./raspitherm_listener.py"
@@ -195,7 +195,7 @@ class RaspithermControlResource(Resource):
         """
         Run when user wants to set the heating on or off
         """
-        intended_status = request.get_param("hw", force=unicode)
+        intended_status = request.get_param("hw", force=str)
         outcome = self.heating_controller.set_hw(intended_status)
         logging.info("Turn hot water {}, status now: {}".format(intended_status, outcome))
         return outcome
@@ -204,7 +204,7 @@ class RaspithermControlResource(Resource):
         """
         Run when user wants to set the central heating on or off
         """
-        intended_status = request.get_param("ch", force=unicode)
+        intended_status = request.get_param("ch", force=str)
         outcome = self.heating_controller.set_ch(intended_status)
         logging.info("Turn central heating {}, status now: {}".format(intended_status, outcome))
         return outcome
@@ -229,15 +229,14 @@ class RaspithermControlSite(Site, object):
         Called automatically when exiting the reactor. Here we tell the HeatingController class to tear down its resources
         """
         self.resource.teardown()
-    
-    
+
     
 def start_if_not_running():
     """
     Checks if the process is running, if not, starts it!
     """
     pids = get_matching_pids(APP_NAME, exclude_self=True) #Will remove own PID
-    pids = filter(bool,pids)
+    pids = list(filter(bool,pids))
     if not pids: #No match! Implies we need to fire up the listener
         logging.info("[STARTING] Raspitherm Listener with PID {}".format(os.getpid()))
     
