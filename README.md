@@ -39,10 +39,11 @@ Therefore you need a heating programmer that has indicator LEDs, and manual on/o
 
 ### Software Installation - automatic ###
 1. Become root
-```sudo su
+```bash
+sudo su
 ```
 2. Run the install.sh server script
-```
+```bash
 chmod +x ./server_scripts/install.sh
 ./server_scripts/install.sh
 ```
