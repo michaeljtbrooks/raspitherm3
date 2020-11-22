@@ -174,7 +174,7 @@ class RaspithermControlResource(Resource):
                 "ch": ch_status,
             }
             try:
-                return json.dumps(json_data)
+                return bytes(json.dumps(json_data), encoding="utf-8", errors="ignore")
             except:
                 return b"Error: Json fkucked up"
         
