@@ -22,7 +22,7 @@ logging.basicConfig(format='[%(asctime)s RASPIhome] %(message)s', datefmt='%H:%M
 def odict2int(ordered_dict):
     """
     Converts an OrderedDict with unicode values to integers (port and pins).
-    @param Odict: <OrderedDict> containg RASPILED configuration.
+    @param ordered_dict: <OrderedDict> containg RASPILED configuration.
 
     @returns: <OrderedDict> with integers instead of unicode values.
     """
@@ -82,7 +82,14 @@ class SmartRequest(Request, object):
         
         @return: ["val1","val2"] LIST of arguments, or the default
         """
-        return self.args.get(name, default)
+        try:
+            return self.args[name]
+        except KeyError:
+            try:
+                return self.args[bytes(name, encoding="utf-8", errors="ignore")]
+            except KeyError:
+                pass
+        return default
     get_params = get_param_values #Alias
     get_list = get_param_values #Alias
     get_params_list = get_param_values #Alias
@@ -96,8 +103,10 @@ class SmartRequest(Request, object):
         @keyword force: <type> A class / type to force the output into. Default is returned if we cannot force the value into this type 
         """
         val = NOT_SET
-        if isinstance(names,str):
+        if isinstance(names, str):
             names = [names]
+        if isinstance(names, bytes):
+            names = [str(names)]
         for name in names:
             val = self.get_param_values(name=name, default=NOT_SET)
             if val is not NOT_SET:  # Once we find a valid value, continue
@@ -106,7 +115,7 @@ class SmartRequest(Request, object):
         if val is NOT_SET:
             return default
         try:
-            if len(val)==1:
+            if len(val) == 1:
                 single_val = val[0]
                 if force is not None:
                     return force(single_val)
@@ -130,7 +139,10 @@ class SmartRequest(Request, object):
             try:
                 return self.args[param_name] or True
             except KeyError:
-                pass
+                try:
+                    return self.args[bytes(param_name, encoding="utf-8", errors="ignore")] or True
+                except KeyError:
+                    pass
         return False
 
     def has_param(self, param_name):

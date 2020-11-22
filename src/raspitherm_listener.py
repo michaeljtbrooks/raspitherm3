@@ -67,8 +67,8 @@ if os.path.exists(config_path):
     logging.info('Using config file: {}'.format(config_path))
     parser.read(config_path)
 else:
-    logging.warn('No config file found. Creating default {} file.'.format(config_path))
-    logging.warn('*** Please edit this file as needed. ***')
+    logging.warning('No config file found. Creating default {} file.'.format(config_path))
+    logging.warning('*** Please edit this file as needed. ***')
     parser = configparser.ConfigParser(defaults=DEFAULTS)
     with open(config_path, 'w') as f:
         parser.write(f)
@@ -141,7 +141,7 @@ class RaspithermControlResource(Resource):
             if request.has_param(key_name):
                 action_func_name = "action__%s" % action_name
                 _action_result = getattr(self, action_func_name)(request) #Execute that function
-                return_json = True;
+                return_json = True
                 break
         
         #Read our statuses:
