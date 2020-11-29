@@ -5,6 +5,7 @@
     
     Useful functions
 """
+import datetime
 
 import pigpio
 import os
@@ -206,6 +207,82 @@ class PiPinInterface(pigpio.pi, object):
         supplementary_interface = interface_class(pin_id, *args, **kwargs)
         setattr(self, name, supplementary_interface)
         return supplementary_interface
+
+
+class TemperatureHumiditySensor(object):
+    """
+    Binds a temperature/humidity sensor
+    Uses DHTXX class, which is an interface to pigpio.pi(). pigpio_interface keyword allows us to reuse objects.
+    """
+    iface_class = DHT11
+    iface = None
+    pigpio_interface = None
+    gpio_pin = 20
+    mode = 11
+    lockout_secs = 10
+    last_data = None
+    last_query_time = None
+
+    def __init__(self, mode=mode, gpio=gpio_pin, pigpio_interface=None, *args, **kwargs):
+        """
+        Bind the correct interface
+        :param mode: The mode we're in (either DHT11 or DHT22)
+        :param gpio: The pin this sensor is available on
+        :param pigpio_interface: <Pigpio> Reuse this Pigpio interface if desired
+        """
+        self.mode = mode
+        if mode in (1, 11, "1", "11", "DHT11"):
+            self.iface_class = DHT11
+            self.lockout_secs = 10
+        else:
+            self.iface_class = DHT22
+            self.lockout_secs = 5
+        self.gpio_pin = gpio
+        self.pigpio_interface = pigpio_interface
+
+    def get_interface(self):
+        """
+        Gets the active interface or sets a new one
+        """
+        if self.iface is None:
+            self.iface = self.generate_interface(gpio=self.gpio_pin)
+        return self.iface
+
+    def generate_interface(self, gpio=None, pigpio_interface=None):
+        """
+        Generates a new interface based upon the iface class
+        """
+        if gpio is None:
+            gpio = self.gpio_pin
+        if pigpio_interface is None:
+            pigpio_interface = self.pigpio_interface
+        self.iface = self.iface_class(gpio=gpio, pi=pigpio_interface)
+        print("\tTemperature/Humidity {} sensor added on pin {}.".format(self.iface_class.__name__, gpio))
+        return self.iface
+
+    def read(self):
+        """
+        Attempts to get the temperature
+        """
+        now = datetime.datetime.now()
+        query_again = True
+        if self.last_query_time:
+            queried_ago_td = now - self.last_query_time
+            if queried_ago_td.seconds < self.lockout_secs:
+                query_again = False
+        iface = self.get_interface()
+        if query_again:
+            try:
+                latest_temp_humidity = iface.read()  # Blocking!!
+            except TimeoutError:
+                logging.warning("{}.read(): Sensor timeout, pin {}!".format(self.__class__.__name__, self.gpio_pin))
+                return self.last_data or {}
+            if latest_temp_humidity.get("valid"):  # Only return a value if it is valid!
+                self.last_data = latest_temp_humidity or {}
+                self.last_data["query_timestamp"] = now
+                self.last_query_time = now
+                return self.last_data
+        return self.last_data
 
 
 class BaseRaspiHomeDevice(object):

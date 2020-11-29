@@ -8,17 +8,18 @@ if [ "$EUID" -ne 0 ]
 fi
 
 echo "  Installing prerequisites..."
-sudo apt-get install build-essential unzip wget
+sudo apt-get install -y build-essential unzip wget
 
 echo "  Installing Python..."
-sudo apt-get install python-dev python3-dev
-sudo apt-get install python-setuptools python3-setuptools
+sudo apt-get install -y python-dev python3-dev
+sudo apt-get install -y python-setuptools python3-setuptools
 
 echo "  Installing PyPi package management..."
-sudo apt-get install python-pip python3-pip
+sudo apt-get install -y python-pip python3-pip
+sudo apt-get install -y python3-venv
 
 echo "  Installing git repository manager..."
-sudo apt-get install git
+sudo apt-get install -y git
 
 echo "  Installing PiGPIO (this may take a while on a Raspberry Pi)..."
 cd /root
@@ -36,7 +37,7 @@ git clone https://github.com/michaeljtbrooks/raspitherm3.git /opt/raspitherm
 
 echo "  Creating Python3 virtual environment for Raspitherm..."
 python3 -m venv /opt/raspitherm/env
-source /opt/raspitherm/env
+source /opt/raspitherm/env/bin/activate
 pip3 install wheel
 pip3 install -r /opt/raspitherm/src/requirements.txt
 chmod -R 0755 /opt/raspitherm
