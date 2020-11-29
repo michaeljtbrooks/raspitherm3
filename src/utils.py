@@ -223,11 +223,11 @@ class TemperatureHumiditySensor(object):
     last_data = None
     last_query_time = None
 
-    def __init__(self, mode=mode, gpio=gpio_pin, pigpio_interface=None, *args, **kwargs):
+    def __init__(self, gpio=gpio_pin, mode=mode, pigpio_interface=None, *args, **kwargs):
         """
         Bind the correct interface
-        :param mode: The mode we're in (either DHT11 or DHT22)
         :param gpio: The pin this sensor is available on
+        :param mode: The mode we're in (either DHT11 or DHT22)
         :param pigpio_interface: <Pigpio> Reuse this Pigpio interface if desired
         """
         self.mode = mode
@@ -283,6 +283,30 @@ class TemperatureHumiditySensor(object):
                 self.last_query_time = now
                 return self.last_data
         return self.last_data
+
+    def get_temp_c(self):
+        data = self.read()
+        return data.get("temp_c", None)
+
+    @property
+    def temp_c(self):
+        return self.get_temp_c()
+
+    @property
+    def temperature(self):
+        return self.get_temp_c()
+
+    @property
+    def temp(self):
+        return self.get_temp_c()
+
+    def get_humidity(self):
+        data = self.read()
+        return data.get("humidity", None)
+
+    @property
+    def humidity(self):
+        return self.get_humidity()
 
 
 class BaseRaspiHomeDevice(object):
