@@ -57,6 +57,8 @@ DEFAULTS = {
         'cw_status_pin': 27,
         'pulse_duration_ms': 200,  # Duration of pulse
         'relay_delay_ms': 200,  # How long it takes for the relays to be thrown
+        'th_sensor_pin': None,
+        'th_sensor_type': "DHT11",
     }
 
 # Generate or read a config file.
@@ -168,9 +170,9 @@ class RaspithermControlResource(Resource):
         try:
             th_temp_c = th["temp_c"]
             th_humidity = th["humidity"]
-        except (KeyError, AttributeError):  # Failure
+        except (KeyError, AttributeError, TypeError):  # Failure
             th = {}
-            th_style = "" #"display: none;"  # Hidden
+            th_style = "display: none;"  # Hidden
             th_available = 0
             th_temp_c = "20"
             th_humidity = "50"

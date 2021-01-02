@@ -72,7 +72,7 @@ class HeatingController(BaseRaspiHomeDevice):
                 self.iface.set_pull_up_down(self._CH_TOGGLE_PIN, pigpio.PUD_OFF)
                 self.iface.set_pull_up_down(self._HW_STATUS_PIN, pigpio.PUD_OFF)
                 self.iface.set_pull_up_down(self._CH_STATUS_PIN, pigpio.PUD_OFF)
-                if self._TH_SENSOR_PIN:
+                if self._TH_SENSOR_PIN and self._TH_SENSOR_TYPE:
                     self.add_temp_humidity_interface(pin_id=self._TH_SENSOR_PIN, sensor_type=self._TH_SENSOR_TYPE)
             except (AttributeError, IOError, pigpio.error) as e:
                 print(("ERROR: Cannot configure pins hw={},{} ch={},{}: {}".format(self._HW_TOGGLE_PIN, self._HW_STATUS_PIN, self._CH_TOGGLE_PIN, self._CH_STATUS_PIN, e)))
@@ -166,7 +166,7 @@ class HeatingController(BaseRaspiHomeDevice):
 
         """
         if self.iface_temp_humid:
-            return self.read_temp_humidity(use_cache=True)
+            return self.read_temp_humidity(use_cache=True) or {}
         return {}
     
     def check_status(self):
