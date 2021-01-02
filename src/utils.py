@@ -275,9 +275,11 @@ class TemperatureHumiditySensor(object):
         print("\tTemperature/Humidity {} sensor added on pin {}.".format(self.iface_class.__name__, gpio))
         return self.iface
 
-    def read(self):
+    def read(self, iface=None):
         """
         Attempts to get the temperature
+
+        :param iface: The interface class instance. Required when calling read() in threads. Otherwise fetches from self.
         """
         now = datetime.datetime.now()
         query_again = True
@@ -285,7 +287,8 @@ class TemperatureHumiditySensor(object):
             queried_ago_td = now - self.last_query_time
             if queried_ago_td.seconds < self.lockout_secs:
                 query_again = False
-        iface = self.get_interface()
+        if iface is None:  # Necessary workaround to stop threads from spinning up another interface
+            iface = self.get_interface()
         if query_again:
             try:
                 latest_temp_humidity = iface.read()  # Blocking!!
@@ -309,7 +312,7 @@ class TemperatureHumiditySensor(object):
         """
         Attempts to read the sensor, updates self.last_data without blocking.
         """
-        self.async_read_thread = threading.Thread(target=self.read)
+        self.async_read_thread = threading.Thread(target=self.read, kwargs={"iface": self.iface})
         self.async_read_thread.start()
 
     read_async = read_non_blocking  # alias
