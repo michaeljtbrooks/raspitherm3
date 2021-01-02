@@ -73,6 +73,7 @@ class HeatingController(BaseRaspiHomeDevice):
                 self.iface.set_pull_up_down(self._HW_STATUS_PIN, pigpio.PUD_OFF)
                 self.iface.set_pull_up_down(self._CH_STATUS_PIN, pigpio.PUD_OFF)
                 if self._TH_SENSOR_PIN and self._TH_SENSOR_TYPE:
+                    self.iface.set_mode(self._TH_SENSOR_PIN, pigpio.INPUT)
                     self.add_temp_humidity_interface(pin_id=self._TH_SENSOR_PIN, sensor_type=self._TH_SENSOR_TYPE)
             except (AttributeError, IOError, pigpio.error) as e:
                 print(("ERROR: Cannot configure pins hw={},{} ch={},{}: {}".format(self._HW_TOGGLE_PIN, self._HW_STATUS_PIN, self._CH_TOGGLE_PIN, self._CH_STATUS_PIN, e)))
@@ -112,7 +113,7 @@ class HeatingController(BaseRaspiHomeDevice):
         if pin_id is None:
             print("Error: Cannot add a temperature/humidity sensor, no pin number supplied.")
         self.iface_temp_humid = TemperatureHumiditySensor(gpio=pin_id, mode=sensor_type, pigpio_interface=self.iface)
-        self.iface_temp_humid.read()  # Perform first read.
+        self.iface_temp_humid.read_non_blocking(delay=5.0)  # Perform first read after enough time has passed for sensor to initialise
         return self.iface_temp_humid
 
     def get_has_temp_humidity_sensor(self):

@@ -275,11 +275,12 @@ class TemperatureHumiditySensor(object):
         print("\tTemperature/Humidity {} sensor added on pin {}.".format(self.iface_class.__name__, gpio))
         return self.iface
 
-    def read(self, iface=None):
+    def read(self, iface=None, delay=0.0):
         """
         Attempts to get the temperature
 
         :param iface: The interface class instance. Required when calling read() in threads. Otherwise fetches from self.
+        :param delay: <float> how many seconds to pause before actually trying to read the sensor
         """
         print("read(): iface={}".format(iface))
         now = datetime.datetime.now()
@@ -291,8 +292,10 @@ class TemperatureHumiditySensor(object):
         if iface is None:  # Necessary workaround to stop threads from spinning up another interface
             iface = self.get_interface()
         if query_again:
+            if delay:
+                sleep(delay)
             try:
-                latest_temp_humidity = iface.read()  # Blocking!!
+                latest_temp_humidity = iface.read(retries=3)  # Blocking!!
             except TimeoutError:
                 logging.warning("{}.read(): Sensor timeout, pin {}!".format(self.__class__.__name__, self.gpio_pin))
                 return self.last_data or {}
@@ -309,12 +312,13 @@ class TemperatureHumiditySensor(object):
         """
         return self.last_data
 
-    def read_non_blocking(self):
+    def read_non_blocking(self, delay=0.0):
         """
         Attempts to read the sensor, updates self.last_data without blocking.
+        :param delay: <float> how many seconds to pause before actually trying to read the sensor
         """
         print("read_non_blocking(): self.iface={}".format(self.iface))
-        self.async_read_thread = threading.Thread(target=self.read, kwargs={"iface": self.iface})
+        self.async_read_thread = threading.Thread(target=self.read, kwargs={"iface": self.iface, "delay": delay})
         self.async_read_thread.start()
 
     read_async = read_non_blocking  # alias
