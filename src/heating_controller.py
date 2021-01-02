@@ -112,7 +112,7 @@ class HeatingController(BaseRaspiHomeDevice):
         if pin_id is None:
             print("Error: Cannot add a temperature/humidity sensor, no pin number supplied.")
         self.iface_temp_humid = TemperatureHumiditySensor(gpio=pin_id, mode=sensor_type, pigpio_interface=self.iface)
-        self.iface_temp_humid.read_non_blocking()  # Perform first read.
+        self.iface_temp_humid.read()  # Perform first read.
         return self.iface_temp_humid
 
     def get_has_temp_humidity_sensor(self):
