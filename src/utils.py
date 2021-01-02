@@ -303,6 +303,7 @@ class TemperatureHumiditySensor(object):
                 self.last_data = latest_temp_humidity or {}
                 self.last_data["query_timestamp"] = now
                 self.last_query_time = now
+                print(latest_temp_humidity)
                 return self.last_data
         return self.last_data
 
