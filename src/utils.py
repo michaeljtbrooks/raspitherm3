@@ -282,7 +282,7 @@ class TemperatureHumiditySensor(object):
         :param iface: The interface class instance. Required when calling read() in threads. Otherwise fetches from self.
         :param delay: <float> how many seconds to pause before actually trying to read the sensor
         """
-        print("read(): iface={}".format(iface))
+        # print("read(): iface={}".format(iface))
         now = datetime.datetime.now()
         query_again = True
         if self.last_query_time:
@@ -311,16 +311,20 @@ class TemperatureHumiditySensor(object):
         """
         Read the last result without re-querying the sensor ever
         """
-        return self.last_data
+        return self.last_data or {}
 
     def read_non_blocking(self, delay=0.0):
         """
         Attempts to read the sensor, updates self.last_data without blocking.
         :param delay: <float> how many seconds to pause before actually trying to read the sensor
         """
-        print("read_non_blocking(): self.iface={}".format(self.iface))
-        self.async_read_thread = threading.Thread(target=self.read, kwargs={"iface": self.iface, "delay": delay})
-        self.async_read_thread.start()
+        # print("read_non_blocking(): self.iface={}".format(self.iface))
+        async_thread_is_running = False
+        if self.async_read_thread and self.async_read_thread.is_alive():
+            async_thread_is_running = True
+        if not async_thread_is_running:
+            self.async_read_thread = threading.Thread(target=self.read, kwargs={"iface": self.iface, "delay": delay})
+            self.async_read_thread.start()
 
     read_async = read_non_blocking  # alias
 

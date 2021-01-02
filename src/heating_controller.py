@@ -134,7 +134,11 @@ class HeatingController(BaseRaspiHomeDevice):
         # We always read the last data item unless told to otherwise:
         if use_cache:
             latest_temp_humidity = self.iface_temp_humid.read_last_result()
-            self.iface_temp_humid.read_non_blocking()  # Now update the cache
+            if not latest_temp_humidity:  # Force a delay for our first ever read
+                delay = 5.0
+            else:
+                delay = 0.0
+            self.iface_temp_humid.read_non_blocking(delay=delay)  # Now update the cache
         else:
             latest_temp_humidity = self.iface_temp_humid.read()
         self.th = latest_temp_humidity
