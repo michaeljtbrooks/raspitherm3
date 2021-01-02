@@ -192,13 +192,13 @@ class RaspithermControlResource(Resource):
                 "th_available": th_available,
                 "th_style": th_style,
                 "th_temp_c": th_temp_c,
-                "th_humidity": th_humidity,
-                "th": th
+                "th_humidity": th_humidity
             }
             try:
                 return bytes(json.dumps(json_data), encoding="utf-8", errors="ignore")
-            except:
-                return b"Error: Json fkucked up"
+            except Exception as e:
+                err_msg = "Error: {} - {}".format(e.__class__.__name__, e)
+                return err_msg.encode("utf-8")
         
         # HTML output - Return normal page
         request.setHeader("Content-Type", "text/html; charset=utf-8")

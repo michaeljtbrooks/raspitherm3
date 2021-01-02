@@ -325,6 +325,8 @@ class TemperatureHumiditySensor(object):
         if not async_thread_is_running:
             self.async_read_thread = threading.Thread(target=self.read, kwargs={"iface": self.iface, "delay": delay})
             self.async_read_thread.start()
+        else:
+            print("\tread_non_blocking(): A read is already taking place. Ignoring duplicate call.")
 
     read_async = read_non_blocking  # alias
 
