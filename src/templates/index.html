@@ -1,7 +1,7 @@
 <html>
     <head>
         <title>Raspitherm</title>
-        <link rel="stylesheet" id="style" href="/static/css/raspitherm.css">
+        <link rel="stylesheet" id="style" href="/static/css/raspitherm.css?20210102">
         <script src="/static/js/jquery3.min.js"></script>
         <script src="/static/js/raspitherm.js"></script>
         <link rel="icon" href="/static/figs/raspitherm_favicon512.png">
@@ -17,30 +17,46 @@
     <body>
 
         <div class="logo">
-            <img src="/static/figs/raspitherm.svg">
+            <img src="/static/figs/raspitherm.svg" alt="Raspitherm">
         </div>
 
         <div id="controls" class="controls">
 
             <div id="central_heating" class="row" data-status="{ch_status}">
                 <div id="central_heating_icon" class="icon">
-                    <img id="central_heating_icon_on" class="icon_off" src="/static/figs/central_heating_off.svg" title="Central heating off">
-                    <img id="central_heating_icon_off" class="icon_on" src="/static/figs/central_heating_on.svg" style="display: none;" title="Central heating ON">
+                    <img id="central_heating_icon_on" class="icon_off" src="/static/figs/central_heating_off.svg" alt="Central heating off" title="Central heating off">
+                    <img id="central_heating_icon_off" class="icon_on" src="/static/figs/central_heating_on.svg" style="display: none;" alt="Central heating ON" title="Central heating ON">
                 </div>
                 <label id="central_heating_toggle" class="toggle switch">
                     <input class="toggle_checkbox" type="checkbox" data-keyname="ch" {ch_checked_attr}>
-                    <span class="slider round"></span>
+                    <span class="slideswitch round"></span>
                 </label>
+                <div id="central_heating_thermostat" style="{th_style}" data-th-available="{th_available}">
+                    <span id="central_heating_temperature_display" class="temperature_display">{th_temp_c}</span> <span class="temperature_units">&deg;C</span>
+                    <label id="central_heating_temperature_target" style="display: none;">
+                        <span class="temperature_arrow">&#9654;</span> <span id="central_heating_temperature_target_display" class="temperature_display">--</span> <span class="temperature_units">&deg;C</span>
+                        <br>
+                        <input type="range" min="5" max="30" value="{th_temp_c}" id="central_heating_temperature_target_slider" list="target_temperature_tickmarks" step="1">
+                        <datalist id="target_temperature_tickmarks">
+                            <option value="5" label="5"></option>
+                            <option value="10" label="10"></option>
+                            <option value="15"></option>
+                            <option value="20" label="20"></option>
+                            <option value="25"></option>
+                            <option value="30" label="30"></option>
+                        </datalist>
+                    </label>
+                </div>
             </div>
 
             <div id="hot_water" class="row" data-status="{hw_status}">
                 <div id="hot_water_icon" class="icon">
-                    <img id="hot_water_icon_on" class="icon_off" src="/static/figs/hot_water_off.svg" title="Hot water off">
-                    <img id="hot_water_icon_off" class="icon_on" src="/static/figs/hot_water_on.svg" style="display: none;" title="Hot water ON">
+                    <img id="hot_water_icon_on" class="icon_off" src="/static/figs/hot_water_off.svg" title="Hot water off" alt="Hot water off">
+                    <img id="hot_water_icon_off" class="icon_on" src="/static/figs/hot_water_on.svg" style="display: none;" title="Hot water ON" alt="Hot water ON">
                 </div>
                 <label id="hot_water_toggle" class="toggle switch">
                     <input class="toggle_checkbox" type="checkbox" data-keyname="hw" {hw_checked_attr}>
-                    <span class="slider round"></span>
+                    <span class="slideswitch round"></span>
                 </label>
             </div>
 

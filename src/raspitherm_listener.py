@@ -162,8 +162,23 @@ class RaspithermControlResource(Resource):
             ch_status = "off"
             ch_status_js = 0
             ch_checked_attr = ""
-        
-        #Return a JSON object if a result:
+
+        # Temperature and humidity...
+        th = self.heating_controller.check_th()
+        try:
+            th_temp_c = th["temp_c"]
+            th_humidity = th["humidity"]
+        except (KeyError, AttributeError):  # Failure
+            th = {}
+            th_style = "" #"display: none;"  # Hidden
+            th_available = 0
+            th_temp_c = "20"
+            th_humidity = "50"
+        else:  # Success
+            th_style = ""
+            th_available = 1
+
+        # JSON action - Return a JSON object if a result:
         if _action_result is not None or return_json:
             json_data = {
                 "hw_status_js": hw_status_js,
@@ -172,13 +187,18 @@ class RaspithermControlResource(Resource):
                 "ch_status": ch_status,
                 "hw": hw_status,
                 "ch": ch_status,
+                "th_available": th_available,
+                "th_style": th_style,
+                "th_temp_c": th_temp_c,
+                "th_humidity": th_humidity,
+                "th": th
             }
             try:
                 return bytes(json.dumps(json_data), encoding="utf-8", errors="ignore")
             except:
                 return b"Error: Json fkucked up"
         
-        #Otherwise return normal page
+        # HTML output - Return normal page
         request.setHeader("Content-Type", "text/html; charset=utf-8")
         with open(RASPILED_DIR+'/templates/index.html', "r") as web_template:
             htmlstr = web_template.read()  # Reads en bloc. More preferable to line by line concatenation
@@ -189,6 +209,10 @@ class RaspithermControlResource(Resource):
                 ch_status_js=ch_status_js,
                 hw_checked_attr=hw_checked_attr,
                 ch_checked_attr=ch_checked_attr,
+                th_available=th_available,
+                th_style=th_style,
+                th_temp_c=th_temp_c,
+                th_humidity=th_humidity
             ).encode('utf-8')
     
     def action__hw(self, request):

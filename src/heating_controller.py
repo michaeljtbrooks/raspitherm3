@@ -18,7 +18,7 @@ from time import sleep
 
 from pigpio_dht import DHT11, DHT22
 
-from utils import BaseRaspiHomeDevice
+from utils import BaseRaspiHomeDevice, TemperatureHumiditySensor
 
 logging.basicConfig(format='[%(asctime)s RASPITHERM] %(message)s', datefmt='%H:%M:%S',level=logging.INFO)
 
@@ -31,14 +31,16 @@ class HeatingController(BaseRaspiHomeDevice):
     hw = 0  # Current status of hot water
     ch = 0  # Current status of central heating
     th = None  # Current temp and humidity
-    iface = None  #Pigpio interface
+    iface = None  # General Pigpio interface
+    iface_temp_humid = None  # Humidity temperature sensor interface  (could expand this into multiples in future)
+
     # Pins
     _HW_TOGGLE_PIN = 5 
     _CH_TOGGLE_PIN = 26
     _HW_STATUS_PIN = 22
     _CH_STATUS_PIN = 27
-    _DH11_SENSOR_PIN = None
-    _DH22_SENSOR_PIN = None
+    _TH_SENSOR_PIN = None  # Temperature humidity sensor pin
+    _TH_SENSOR_TYPE = "DHT11"  # Temperature humidity sensor type (DHT11 or DHT22)
     _PULSE_DURATION_MS = 200  # How long a toggle pulse should be (milliseconds)
     _RELAY_DELAY_MS = 200  # How long to wait before rechecking the status after a toggle (enough time for relay to switch) 
     
@@ -56,9 +58,8 @@ class HeatingController(BaseRaspiHomeDevice):
         # Inputs
         self._HW_STATUS_PIN = config.get("hw_status_pin", self._HW_STATUS_PIN)
         self._CH_STATUS_PIN = config.get("ch_status_pin", self._CH_STATUS_PIN)
-        self._DH11_SENSOR_PIN = config.get("DH11_sensor_pin", self._DH11_SENSOR_PIN)
-        self._DH22_SENSOR_PIN = config.get("DH22_sensor_pin", self._DH22_SENSOR_PIN)
-        self._RELAY_DELAY_MS = config.get("relay_delay_ms", self._RELAY_DELAY_MS)
+        self._TH_SENSOR_PIN = config.get("th_sensor_pin", self._TH_SENSOR_PIN)
+        self._TH_SENSOR_TYPE = config.get("th_sensor_type", self._TH_SENSOR_TYPE)
         
         # Configure pins (we are using hardware pull-down resistors, so turn the internals off):
         if self.iface.connected:
@@ -71,14 +72,8 @@ class HeatingController(BaseRaspiHomeDevice):
                 self.iface.set_pull_up_down(self._CH_TOGGLE_PIN, pigpio.PUD_OFF)
                 self.iface.set_pull_up_down(self._HW_STATUS_PIN, pigpio.PUD_OFF)
                 self.iface.set_pull_up_down(self._CH_STATUS_PIN, pigpio.PUD_OFF)
-                if self._DH22_SENSOR_PIN:
-                    self.iface.set_mode(self._DH22_SENSOR_PIN, pigpio.INPUT)
-                    self.iface.set_pull_up_down(self._DH22_SENSOR_PIN, pigpio.PUD_OFF)
-                    self.add_temp_humidity_dht22_interface(pin_id=self._DH22_SENSOR_PIN)
-                elif self._DH11_SENSOR_PIN:
-                    self.iface.set_mode(self._DH11_SENSOR_PIN, pigpio.INPUT)
-                    self.iface.set_pull_up_down(self._DH11_SENSOR_PIN, pigpio.PUD_OFF)
-                    self.add_temp_humidity_dht11_interface(pin_id=self._DH11_SENSOR_PIN)
+                if self._TH_SENSOR_PIN:
+                    self.add_temp_humidity_interface(pin_id=self._TH_SENSOR_PIN, sensor_type=self._TH_SENSOR_TYPE)
             except (AttributeError, IOError, pigpio.error) as e:
                 print(("ERROR: Cannot configure pins hw={},{} ch={},{}: {}".format(self._HW_TOGGLE_PIN, self._HW_STATUS_PIN, self._CH_TOGGLE_PIN, self._CH_STATUS_PIN, e)))
         else:
@@ -106,48 +101,43 @@ class HeatingController(BaseRaspiHomeDevice):
             "hw": self.hw,
             "ch": self.ch
         }
-        if self.get_has_temp_humidity_sensor():
+        if self.get_has_temp_humidity_sensor() and self.th:
             out["th"] = self.th
         return out
 
-    def add_temp_humidity_dht11_interface(self, pin_id=None, name="temp_humidity"):
+    def add_temp_humidity_interface(self, pin_id=None, sensor_type=None):
         """
         Add in the pigpio_dht powered interface
         """
-        return self.iface.add_supplementary_pin_interface(pin_id=pin_id, name=name, interface_class=DHT11)
+        if pin_id is None:
+            print("Error: Cannot add a temperature/humidity sensor, no pin number supplied.")
+        self.iface_temp_humid = TemperatureHumiditySensor(gpio=pin_id, mode=sensor_type, pigpio_interface=self.iface)
+        self.iface_temp_humid.read_non_blocking()  # Perform first read.
+        return self.iface_temp_humid
 
-    def add_temp_humidity_dht22_interface(self, pin_id=None, name="temp_humidity"):
-        """
-        Add in the pigpio_dht powered interface
-        """
-        return self.iface.add_supplementary_pin_interface(pin_id=pin_id, name=name, interface_class=DHT22)
-
-    def get_has_temp_humidity_sensor(self, name="temp_humidity"):
+    def get_has_temp_humidity_sensor(self):
         """
         Return True if sensor exists
         """
-        return bool(getattr(self.iface, name, False))
+        return bool(self.iface_temp_humid)
 
-    def read_temp_humidity(self, name="temp_humidity"):
+    def read_temp_humidity(self, use_cache=True):
         """
         Read the relevant interface:
+
+        :param use_cache: <bool> If True, don't perform a blocking read. Read the cached data then do an async refetch.
         """
-        try:
-            temp_humidity_subinterface = getattr(self.iface, name)
-        except AttributeError:
-            logging.warning("{}.read_temp_humidity(): No sensor interface by name {}.".format(self.__class__.__name__, name))
+        if not self.iface_temp_humid:
+            logging.warning("{}.read_temp_humidity(): No sensor interface.".format(self.__class__.__name__))
             return {}
-        if temp_humidity_subinterface:  # No sensor added
-            return {}
-        try:
-            latest_temp_humidity = temp_humidity_subinterface.read()
-        except TimeoutError:
-            logging.warning("{}.read_temp_humidity(): Sensor timeout! {}".format(self.__class__.__name__, name))
-            return {}
-        if latest_temp_humidity.get("valid"):  # Only return a value if it is valid!
-            self.th = latest_temp_humidity
-            return latest_temp_humidity
-        return self.th
+        # We always read the last data item unless told to otherwise:
+        if use_cache:
+            latest_temp_humidity = self.iface_temp_humid.read_last_result()
+            self.iface_temp_humid.read_non_blocking()  # Now update the cache
+        else:
+            latest_temp_humidity = self.iface_temp_humid.read()
+        self.th = latest_temp_humidity
+        return latest_temp_humidity
     
     def check_hw(self):
         """
@@ -162,6 +152,22 @@ class HeatingController(BaseRaspiHomeDevice):
         """
         self.ch = self.read(self._CH_STATUS_PIN)
         return self.ch
+
+    def check_th(self):
+        """
+        Reads temp and humidity with caching
+        :return: {
+            'temp_c': 22,
+            'temp_f': 71.6,
+            'humidity': 41,
+            'valid': True,
+            'query_timestamp': datetime.datetime(2021, 1, 2, 13, 27, 31, 644130)
+        }
+
+        """
+        if self.iface_temp_humid:
+            return self.read_temp_humidity(use_cache=True)
+        return {}
     
     def check_status(self):
         """
@@ -170,6 +176,7 @@ class HeatingController(BaseRaspiHomeDevice):
         """
         self.check_ch()
         self.check_hw()
+        self.check_th()
         return self.status    
     
     def set_hw(self, value):
@@ -198,4 +205,8 @@ class HeatingController(BaseRaspiHomeDevice):
         Called when exiting the listener. Tear down any async threads here
         """
         logging.info("\tHeatingController {}: exiting...".format(self.__class__.__name__))
-    
+        if self.iface_temp_humid:
+            try:
+                self.iface_temp_humid.teardown()
+            except TimeoutError:
+                pass

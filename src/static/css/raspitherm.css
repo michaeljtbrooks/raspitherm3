@@ -42,7 +42,8 @@ a{
     margin: 2em auto;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: flex-start;
+    width: fit-content;
 }
 .row {
     display: flex;
@@ -70,8 +71,8 @@ a{
 /* Hide default HTML checkbox */
 .switch input {display:none;}
 
-/* The slider */
-.slider {
+/* The slide switch */
+.slideswitch {
   position: absolute;
   cursor: pointer;
   top: 0;
@@ -87,7 +88,7 @@ a{
 
 }
 
-.slider:before {
+.slideswitch:before {
   position: absolute;
   content: "";
   height: 104px;
@@ -99,26 +100,26 @@ a{
   transition: .4s;
 }
 
-input:checked + .slider {
+input:checked + .slideswitch {
   background-color: #D80027;
 }
 
-input:focus + .slider {
+input:focus + .slideswitch {
   box-shadow: 0 0 1px #D80027;
 }
 
-input:checked + .slider:before {
+input:checked + .slideswitch:before {
   -webkit-transform: translateX(104px);
   -ms-transform: translateX(104px);
   transform: translateX(104px);
 }
 
 /* Rounded sliders */
-.slider.round {
+.slideswitch.round {
   border-radius: 136px;
 }
 
-.slider.round:before {
+.slideswitch.round:before {
   border-radius: 50%;
 }
 
@@ -129,3 +130,30 @@ input:checked + .slider:before {
     margin-left:15px;
     margin-right:15px;
 }
+
+
+/* Thermostat */
+#central_heating_thermostat {
+    margin-left: 1em;
+}
+
+.temperature_display {
+    font-size: 1.8rem;
+    color: #202020;
+}
+
+.temperature_arrow {
+    font-size: 1.4rem;
+    color: #aaa;
+    margin: 0 0.25em;
+}
+
+.temperature_units {
+    font-size: 1rem;
+    color: #aaa;
+}
+
+input[type="range"]{
+    width: 10rem;
+}
+

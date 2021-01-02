@@ -5,7 +5,9 @@
     
     Useful functions
 """
+import copy
 import datetime
+import threading
 
 import pigpio
 import os
@@ -220,6 +222,7 @@ class TemperatureHumiditySensor(object):
     gpio_pin = 20
     mode = 11
     lockout_secs = 10
+    async_read_thread = None
     last_data = None
     last_query_time = None
 
@@ -239,6 +242,18 @@ class TemperatureHumiditySensor(object):
             self.lockout_secs = 5
         self.gpio_pin = gpio
         self.pigpio_interface = pigpio_interface
+
+    def get_mode_str(self):
+        """
+        States what sensor we're using
+        """
+        return self.iface_class.__name__
+
+    def __repr__(self):
+        """
+        Say what this is
+        """
+        return "{} @ pin #{}".format(self.get_mode_str(), self.gpio_pin)
 
     def get_interface(self):
         """
@@ -284,6 +299,21 @@ class TemperatureHumiditySensor(object):
                 return self.last_data
         return self.last_data
 
+    def read_last_result(self):
+        """
+        Read the last result without re-querying the sensor ever
+        """
+        return self.last_data
+
+    def read_non_blocking(self):
+        """
+        Attempts to read the sensor, updates self.last_data without blocking.
+        """
+        self.async_read_thread = threading.Thread(target=self.read)
+        self.async_read_thread.start()
+
+    read_async = read_non_blocking  # alias
+
     def get_temp_c(self):
         data = self.read()
         return data.get("temp_c", None)
@@ -307,6 +337,16 @@ class TemperatureHumiditySensor(object):
     @property
     def humidity(self):
         return self.get_humidity()
+
+    def __bool__(self):
+        return bool(self.iface)
+
+    def teardown(self):
+        """
+        Tear down any async threads here.
+        """
+        if self.async_read_thread:
+            self.async_read_thread.join(timeout=3.0)
 
 
 class BaseRaspiHomeDevice(object):
@@ -416,7 +456,10 @@ class BaseRaspiHomeDevice(object):
                 logging.info("iface not connected!")
                 need_to_generate_new_interface = True
         if need_to_generate_new_interface:
-            self.iface = self.generate_new_interface(config)
+            iface_params = copy.copy(config)
+            iface_params["pi_host"] = pi_host
+            iface_params["pig_port"] = pig_port
+            self.iface = self.generate_new_interface(iface_params)
         else:
             self.iface = interface
         return self.iface

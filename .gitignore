@@ -13,3 +13,4 @@
 /.venv
 /.idea
 /.settings/
+__pycache__/
