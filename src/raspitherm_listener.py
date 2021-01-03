@@ -32,7 +32,7 @@ import json
 import os
 from subprocess import check_output, CalledProcessError
 import time
-from twisted.internet import reactor, endpoints,protocol
+from twisted.internet import reactor, endpoints, protocol, task
 from twisted.web.resource import Resource
 from twisted.web.server import Site, Request
 from twisted.web.static import File
@@ -57,6 +57,7 @@ DEFAULTS = {
         'cw_status_pin': 27,
         'pulse_duration_ms': 200,  # Duration of pulse
         'relay_delay_ms': 200,  # How long it takes for the relays to be thrown
+        'sensor_polling_period_seconds': 60,
         'th_sensor_pin': 0,
         'th_sensor_type': "DHT11",
     }
@@ -75,6 +76,9 @@ else:
     with open(config_path, 'w') as f:
         parser.write(f)
 CONFIG_SETTINGS = odict2int(parser.defaults()) #Turn the Config file into settings
+
+
+SENSOR_POLLING_PERIOD_SECONDS = CONFIG_SETTINGS.get("sensor_polling_period_seconds", 60)
 
 
 DEBUG = False
@@ -234,7 +238,18 @@ class RaspithermControlResource(Resource):
         outcome = self.heating_controller.set_ch(intended_status)
         logging.info("Turn central heating {}, status now: {}".format(intended_status, outcome))
         return outcome
-    
+
+    def has_sensors_to_poll(self):
+        return bool(self.heating_controller.get_has_temp_humidity_sensor())
+
+    def poll_sensors(self):
+        """
+        Tells the heating controller to ask each sensor what is going on
+        """
+        if self.heating_controller.get_has_temp_humidity_sensor():
+            self.heating_controller.read_temp_humidity(use_cache=True)
+            # TODO: implement target-temperature central heating control response.
+
     def teardown(self):
         """
         Called automatically when exiting the parent reactor
@@ -269,6 +284,11 @@ def start_if_not_running():
         factory = RaspithermControlSite(timeout=8) #8s timeout
         endpoint = endpoints.TCP4ServerEndpoint(reactor, CONFIG_SETTINGS['pi_port'])
         endpoint.listen(factory)
+        # Add a timed loop if there are heating sensors to respond to
+        if factory.resource.has_sensors_to_poll():
+            print("\tPolling sensors every {} seconds".format(SENSOR_POLLING_PERIOD_SECONDS))
+            sensor_task_loop = task.LoopingCall(factory.resource.poll_sensors)
+            sensor_task_loop.start(SENSOR_POLLING_PERIOD_SECONDS)
         reactor.run()
     else:
         logging.info("Rasptherm Listener already running with PID %s" % ", ".join(pids))
