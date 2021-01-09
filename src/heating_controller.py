@@ -16,8 +16,6 @@ import logging
 import pigpio
 from time import sleep
 
-from pigpio_dht import DHT11, DHT22
-
 from utils import BaseRaspiHomeDevice, TemperatureHumiditySensor
 
 logging.basicConfig(format='[%(asctime)s RASPITHERM] %(message)s', datefmt='%H:%M:%S',level=logging.INFO)

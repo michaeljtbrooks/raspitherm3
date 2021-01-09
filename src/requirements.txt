@@ -1,8 +1,6 @@
 ipython<8
 ipython-genutils==0.2.0
 
-
-
 backports.shutil-get-terminal-size==1.0.0
 decorator<4.5
 enum34<1.2
@@ -21,3 +19,4 @@ wcwidth<0.3
 twisted
 configparser
 pigpio-dht<0.4
+pytz

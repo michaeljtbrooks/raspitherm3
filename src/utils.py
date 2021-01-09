@@ -7,34 +7,33 @@
 """
 import copy
 import datetime
+from dateutil.relativedelta import relativedelta
 import threading
-
 import pigpio
 import os
 import logging
 import subprocess
 from time import sleep
 
+import pytz as pytz
 from pigpio_dht import DHT11, DHT22
 from twisted.web.server import Request
 
+from src.config import NOT_SET, get_current_timezone, DEBUG
 
-logging.basicConfig(format='[%(asctime)s RASPIhome] %(message)s', datefmt='%H:%M:%S',level=logging.INFO)
+logging.basicConfig(format='[%(asctime)s RASPIhome] %(message)s', datefmt='%H:%M:%S', level=logging.INFO)
 
 
-def odict2int(ordered_dict):
-    """
-    Converts an OrderedDict with unicode values to integers (port and pins).
-    @param ordered_dict: <OrderedDict> containg RASPILED configuration.
-
-    @returns: <OrderedDict> with integers instead of unicode values.
-    """
-    for key, value in list(ordered_dict.items()):
-        try:
-            ordered_dict[key] = int(value)
-        except ValueError:
-            ordered_dict[key] = value
-    return ordered_dict
+def D(item="", *args, **kwargs):
+    if DEBUG:
+        if args or kwargs:
+            try:
+                item = item.format(*args, **kwargs)
+                print(item)
+            except IndexError:
+                item = "{} {} {}".format(item, args, kwargs)
+                print("D_FORMAT_ERROR: {}".format(item))
+        logging.debug(item)
 
 
 def pigpiod_process():
@@ -54,11 +53,6 @@ def pigpiod_process():
     else:
         logging.info('PIGPIOD is running! PID: %s' % output.split('\n')[0]) 
     return process
-
-
-class NotSet():
-    pass
-NOT_SET = NotSet()
 
 
 class SmartRequest(Request, object):
@@ -492,6 +486,225 @@ class BaseRaspiHomeDevice(object):
         self.iface = PiPinInterface(params)
         return self.iface
 
+
+class ProgrammeScheduleEvent(object):
+    """
+    One particular scheduled event
+    """
+    when_weekday = None  # Int
+    when_time_start = None  # Time
+    when_time_end = None  # Time
+    when_timezone = get_current_timezone()  # Tzinfo
+    what_action = None  # str
+    what_action_status = None  # dict of data
+    _day_names = ('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun')
+
+    def __init__(self, day=None, start=None, end=None, timezone=None, action=None, action_status=None, **kwargs):
+        if day is None:  # Day might be int 0
+            day = kwargs.get("weekday", None)
+        self.when_weekday = self.parse_day(day)  # Handles strings and ints
+        self.when_time_start = self.parse_time(start or kwargs.get("time_start", None))
+        self.when_time_end = self.parse_time(end or kwargs.get("time_end", None))
+        self.when_timezone = self.get_timezone_from_expression(timezone or kwargs.get("tz", "local"))
+        self.what_action = action
+        self.what_action_status = copy.copy(action_status)  # The data you'll send it
+
+    def __str__(self):
+        day_part = self._day_names[self.when_weekday]
+        try:
+            start_part = self.when_time_start.strftime("%H:%M")
+        except (AttributeError, TypeError, ValueError):
+            start_part = ""
+        try:
+            end_part = self.when_time_end.strftime("%H:%M")
+        except (AttributeError, TypeError, ValueError):
+            end_part = ""
+        return "{} {}-{}: {}={}".format(day_part, start_part, end_part, self.what_action, self.what_action_status)
+
+    def __repr__(self):
+        return self.__str__()
+
+    def is_scheduled_for_now(self):
+        """
+        Determine if this rule should be active.
+        """
+        now = self.local_now()
+
+        # If we're on a different day of the week, then
+        if self.when_weekday is not None:
+            D("when={} now={}", self.when_weekday, now.weekday())
+            if now.weekday() != self.when_weekday:
+                return False
+
+        start_time_applied_to_today, end_time_applied_to_today = self.get_start_and_end_times_applied_to_today(now)
+
+        if now < start_time_applied_to_today:
+            return False
+        if now > end_time_applied_to_today:
+            return False
+        return True
+
+    def get_start_time_applied_to_today(self, now=None):
+        """
+        Get the start timestamp as though it were today
+        """
+        if now is None:
+            now = self.local_now()
+        if self.when_time_start:
+            start_time_applied_to_today = datetime.datetime.combine(now.date(), self.when_time_start, tzinfo=self.when_timezone)
+        else:
+            start_time_applied_to_today = datetime.datetime.combine(now.date(), datetime.time(0, 0, 0), tzinfo=self.when_timezone)
+        return start_time_applied_to_today
+
+    def get_end_time_applied_to_today(self, now=None):
+        """
+        Get the end timestamp as though it were today
+        """
+        if now is None:
+            now = self.local_now()
+        if self.when_time_end:
+            end_time_applied_to_today = datetime.datetime.combine(now.date(), self.when_time_end, tzinfo=self.when_timezone)
+        else:
+            end_time_applied_to_today = datetime.datetime.combine(now.date(), datetime.time(23, 59, 59, 999999), tzinfo=self.when_timezone)
+        return end_time_applied_to_today
+
+    def get_start_and_end_times_applied_to_today(self, now=None):
+        """
+        Gets the start and end times as though they were applied to now. Corrects for
+        end times spanning midnight.
+        """
+        if now is None:
+            now = self.local_now()
+        start_time_applied_to_today = self.get_start_time_applied_to_today(now)
+        end_time_applied_to_today = self.get_end_time_applied_to_today(now)
+        if end_time_applied_to_today < start_time_applied_to_today:
+            end_time_applied_to_today = end_time_applied_to_today + relativedelta(days=1)
+        return start_time_applied_to_today, end_time_applied_to_today
+
+    def next_start_and_end(self):
+        """
+        Determines if you are currently within the rule or not
+        """
+        now = self.local_now()
+        start_time_applied_to_today, end_time_applied_to_today = self.get_start_and_end_times_applied_to_today(now)
+        if self.is_scheduled_for_now():
+            return start_time_applied_to_today, end_time_applied_to_today
+
+        # Otherwise, assume now is the next day upon when the designated day of the week falls
+        if self.when_weekday:
+            next_start = start_time_applied_to_today + relativedelta(weekday=self.when_weekday)
+            next_start, next_end = self.get_start_and_end_times_applied_to_today(next_start)
+            return next_start, next_end
+
+        # We shouldn't reach here
+        return start_time_applied_to_today, end_time_applied_to_today
+
+    @classmethod
+    def utc_now(cls):
+        return datetime.datetime.now(tz=pytz.utc)
+
+    @classmethod
+    def local_now(cls):
+        local_timezone = get_current_timezone()
+        return datetime.datetime.now(tz=local_timezone)
+
+    @classmethod
+    def convert_to_timezone(cls, dt=None, tz="local"):
+        """
+        Cast the datetime into localtime
+        """
+        target_timezone = cls.get_timezone_from_expression(tz)
+        if dt is None:
+            dt = datetime.datetime.now(tz=pytz.utc)
+        try:
+            try:
+                return target_timezone.localize(dt)
+            except ValueError:  # Occurs when the dt already has a tz set
+                return target_timezone.normalize(dt)
+        except AttributeError:
+            return dt.astimezone(target_timezone)
+
+    @classmethod
+    def localtime(cls, dt=None):
+        return cls.convert_to_timezone(dt=dt, tz="local")
+
+    @classmethod
+    def utctime(cls, dt=None):
+        return cls.convert_to_timezone(dt=dt, tz="utc")
+
+    @classmethod
+    def strptime_formats(cls, dt_expression=None, *args, **kwargs):
+        """
+        Try to turn a string into dt using a variety of formats before bailing out
+
+        :param dt_expression: <str> The expression
+        :param args: Formats to try
+        """
+        if dt_expression is None:
+            return None
+        for format_to_try in args:
+            try:
+                return datetime.datetime.strptime(dt_expression, format_to_try)  # Mon, Tue etc
+            except (TypeError, ValueError):
+                pass
+        return None
+
+    @classmethod
+    def parse_day(cls, day):
+        """
+        Convert a day expression into a python day
+        """
+        if day is None:
+            return None
+        # Assume an int
+        try:
+            day = int(day) % 7
+            return day
+        except (TypeError, ValueError):
+            pass
+        # Try a short day:
+        try:
+            return datetime.datetime.strptime(day, "%a").day  # Mon, Tue etc
+        except (TypeError, ValueError):
+            pass
+        # Try a long day:
+        try:
+            return datetime.datetime.strptime(day, "%A").day  # Monday, Tuesday etc
+        except (TypeError, ValueError):
+            pass
+        return None
+
+    @classmethod
+    def parse_time(cls, time_expression):
+        """
+        Convert time expression into hour + minutes as time object
+        """
+        return cls.strptime_formats(time_expression, "%H:%M", "%H%M", "%I:%M%p", "%I%M%p", "%I%p", "%H").time()
+
+    @classmethod
+    def get_timezone_from_expression(cls, tz_expression):
+        """
+        Returns a timezone object based upon the thing you ask for
+        :param tz_expression: <str> or timezone
+        :return:
+        """
+        if isinstance(tz_expression, (pytz.tzinfo.tzinfo,)):
+            return tz_expression
+        if str(tz_expression).lower() == u"local" or tz_expression in (True, 1, "true", "True", u"true", u"True"):  # Means they want the local timezone
+            target_tz = get_current_timezone()  # Local according to config settings
+        elif str(tz_expression).lower() == u"utc":  # UTC!
+            target_tz = pytz.utc
+        else:  # Ask pytz what timezone it things it is
+            target_tz = pytz.timezone(tz_expression)
+        return target_tz
+
+
+class ProgrammeScheduleMode(object):
+    """
+    Mode which allows you to specify when heating should be on and hot water should be on etc.
+    """
+    name = None
+    events = None
 
 
 def get_matching_pids(name, exclude_self=True):

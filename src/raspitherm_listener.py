@@ -15,8 +15,15 @@
     
         @requires: twisted
 """
+import sys
+import os
 
-from utils import odict2int, SmartRequest, get_matching_pids
+# Add some gymnastics so we can use imports relative to the parent dir.
+my_dir = os.path.dirname(os.path.realpath(__file__)) #The directory we're running in
+sys.path.append(os.path.dirname(my_dir))  # Parent dir
+
+from src.config import RASPILED_DIR, get_setting, CONFIG_SETTINGS, DEBUG
+from src.utils import SmartRequest, get_matching_pids, D
 
 try:
     #python2
@@ -24,14 +31,9 @@ try:
 except ImportError:
     #python3
     from urllib.parse import urlencode
-import configparser
-import copy
-import datetime
 import logging
 import json
-import os
-from subprocess import check_output, CalledProcessError
-import time
+
 from twisted.internet import reactor, endpoints, protocol, task
 from twisted.web.resource import Resource
 from twisted.web.server import Site, Request
@@ -40,55 +42,13 @@ from twisted.web.static import File
 from heating_controller import HeatingController
 
 
+if DEBUG:
+    print("## DEBUG ON ##")
+
 APP_NAME = "python ./raspitherm_listener.py"
 
-logging.basicConfig(format='[%(asctime)s RASPITHERM] %(message)s', datefmt='%H:%M:%S',level=logging.INFO)
+SENSOR_POLLING_PERIOD_SECONDS = get_setting("sensor_polling_period_seconds", 60)
 
-RASPILED_DIR = os.path.dirname(os.path.realpath(__file__)) #The directory we're running in
-
-DEFAULTS = {
-        'config_path' : RASPILED_DIR,
-        'pi_host'     : 'localhost',
-        'pi_port'     : 9090,
-        'pig_port'    : 8888,
-        'hw_toggle_pin': 5,
-        'cw_toggle_pin': 26,
-        'hw_status_pin': 22,
-        'cw_status_pin': 27,
-        'pulse_duration_ms': 200,  # Duration of pulse
-        'relay_delay_ms': 200,  # How long it takes for the relays to be thrown
-        'sensor_polling_period_seconds': 60,
-        'th_sensor_pin': 0,
-        'th_sensor_type': "DHT11",
-    }
-
-# Generate or read a config file.
-config_path = os.path.expanduser(RASPILED_DIR+'/raspitherm.conf')
-parser = configparser.ConfigParser(defaults=DEFAULTS)
-
-if os.path.exists(config_path):
-    logging.info('Using config file: {}'.format(config_path))
-    parser.read(config_path)
-else:
-    logging.warning('No config file found. Creating default {} file.'.format(config_path))
-    logging.warning('*** Please edit this file as needed. ***')
-    parser = configparser.ConfigParser(defaults=DEFAULTS)
-    with open(config_path, 'w') as f:
-        parser.write(f)
-CONFIG_SETTINGS = odict2int(parser.defaults()) #Turn the Config file into settings
-
-
-SENSOR_POLLING_PERIOD_SECONDS = CONFIG_SETTINGS.get("sensor_polling_period_seconds", 60)
-
-
-DEBUG = False
-
-
-def D(item):
-    if DEBUG:
-        print(item)
-        logging.debug(item)
-        
 
 class RaspithermControlResource(Resource):
     """
@@ -291,7 +251,7 @@ def start_if_not_running():
             sensor_task_loop.start(SENSOR_POLLING_PERIOD_SECONDS)
         reactor.run()
     else:
-        logging.info("Rasptherm Listener already running with PID %s" % ", ".join(pids))
+        logging.info("Raspitherm Listener already running with PID %s" % ", ".join(pids))
 
 
 if __name__ == "__main__":
