@@ -56,8 +56,8 @@ a{
 }
 .controls .icon img {
     max-height: 240px;
+    max-width: 30vw;
 }
-
 
 
 /* The switch - the box around the slider */
