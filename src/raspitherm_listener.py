@@ -59,6 +59,7 @@ class RaspithermControlResource(Resource):
     PARAM_TO_ACTION_MAPPING = (
         ("ch", "ch"),
         ("hw", "hw"),
+        ("status", "status"),
     )
     
     def __init__(self, *args, **kwargs):
@@ -198,6 +199,12 @@ class RaspithermControlResource(Resource):
         outcome = self.heating_controller.set_ch(intended_status)
         logging.info("Turn central heating {}, status now: {}".format(intended_status, outcome))
         return outcome
+
+    def action__status(self, request):
+        """
+        Run when user wants to set the central heating on or off
+        """
+        return self.heating_controller.check_status()
 
     def has_sensors_to_poll(self):
         return bool(self.heating_controller.get_has_temp_humidity_sensor())
