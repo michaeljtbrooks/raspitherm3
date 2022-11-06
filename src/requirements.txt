@@ -21,3 +21,4 @@ configparser
 pigpio-dht<0.4
 pytz
 python-dateutil
+simplejson

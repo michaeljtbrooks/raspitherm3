@@ -7,6 +7,10 @@
 """
 import copy
 import datetime
+import random
+from decimal import Decimal
+
+import six
 from dateutil.relativedelta import relativedelta
 import threading
 import pigpio
@@ -45,9 +49,9 @@ def pigpiod_process():
     process = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
     output, _error = process.communicate()
 
-    if output=='':
+    if output == '':
         logging.warning('*** [STARTING PIGPIOD] i.e. "sudo pigpiod" ***')
-        cmd='sudo pigpiod'
+        cmd = 'sudo pigpiod'
         process = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
         output, _error = process.communicate()
     else:
@@ -263,6 +267,10 @@ class TemperatureHumiditySensor(object):
         """
         if gpio is None:
             gpio = self.gpio_pin
+        print("get_interface: gpio_pin=%s" % self.gpio_pin)
+        if not self.gpio_pin and DEBUG:  # We can emulate this in DEBUG mode now
+            self.iface = "EMULATED"
+            return self.iface
         if pigpio_interface is None:
             pigpio_interface = self.pigpio_interface
         self.iface = self.iface_class(gpio=gpio, pi=pigpio_interface)
@@ -288,11 +296,18 @@ class TemperatureHumiditySensor(object):
         if query_again:
             if delay:
                 sleep(delay)
-            try:
-                latest_temp_humidity = iface.read(retries=3)  # Blocking!!
-            except TimeoutError:
-                logging.warning("{}.read(): Sensor timeout, pin {}!".format(self.__class__.__name__, self.gpio_pin))
-                return self.last_data or {}
+
+            # In development mode, if no pin set, then return a randomly walking humidity / temperature
+            if not self.gpio_pin and DEBUG:
+                print("DEBUG mode, and no pin set, emulating read...")
+                latest_temp_humidity = self._development_emulate_sensor_read()
+            else:
+                # Otherwise actually attempt to read the sensor
+                try:
+                    latest_temp_humidity = iface.read(retries=3)  # Blocking!!
+                except TimeoutError:
+                    logging.warning("{}.read(): Sensor timeout, pin {}!".format(self.__class__.__name__, self.gpio_pin))
+                    return self.last_data or {}
             if latest_temp_humidity.get("valid"):  # Only return a value if it is valid!
                 self.last_data = latest_temp_humidity or {}
                 self.last_data["query_timestamp"] = now
@@ -300,6 +315,27 @@ class TemperatureHumiditySensor(object):
                 print(latest_temp_humidity)
                 return self.last_data
         return self.last_data
+
+    def _development_emulate_sensor_read(self):
+        """
+        Emulates reading the sensor for the purposes of development
+        """
+        last_data = self.read_last_result()
+        try:
+            last_temp = Decimal(last_data.get("temp_c", 20.0))
+            new_temp = last_temp + Decimal(random.randint(-20, 20)) / Decimal("10.0")  # Walk it a little bit
+        except (TypeError, ValueError):
+            new_temp = Decimal("20.0")
+        try:
+            last_humidity = Decimal(last_data.get("humidity", 50.0))
+            new_humidity = last_humidity + Decimal(random.randint(-50, 50)) / Decimal("10.0") # Walk it a little bit
+        except (TypeError, ValueError):
+            new_humidity = Decimal("50.0")
+        return {
+            "temp_c": six.u("{}".format(new_temp)),
+            "humidity": six.u("{}".format(new_humidity)),
+            "valid": 1  # Pretend this is real
+        }
 
     def read_last_result(self):
         """
@@ -364,6 +400,20 @@ class BaseRaspiHomeDevice(object):
     A base class for building subclasses to control devices from a Raspberry pi
     """
     iface = None
+    emulated_readable_pins = None
+    
+    def __init__(self, registry=None, emulated_readable_pins=None, *args, **kwargs):
+        """
+        Ensure we have a registry to store data
+        """
+        super(BaseRaspiHomeDevice, self).__init__(*args, **kwargs)
+        if registry is None:
+            self.__class__.registry = {}
+            registry = self.__class__.registry
+        self.registry = registry
+        if DEBUG and emulated_readable_pins is None:
+            emulated_readable_pins = {}
+        self.emulated_readable_pins = emulated_readable_pins
     
     def write(self, pin, value=0):
         """
@@ -378,7 +428,9 @@ class BaseRaspiHomeDevice(object):
             except (AttributeError, IOError):
                 logging.error("ERROR: Cannot output to pins. Value of pin #%s would be %s" % (pin,value))
         else:
-            logging.error("ERROR: Interface not connected. Cannot output to pins. Value of pin #%s would be %s" % (pin,value))
+            logging.error("ERROR: Interface not connected. Cannot output to pins. Value of pin #%s would be %s" % (pin, value))
+            if DEBUG:  # Emulate for debug
+                self.emulated_readable_pins[pin] = value
         return value
     
     def read(self, pin):
@@ -393,8 +445,16 @@ class BaseRaspiHomeDevice(object):
                 value = self.iface.read(pin)
             except (AttributeError, IOError, pigpio.error):
                 logging.error("ERROR: Cannot read value of pin #%s" % (pin,))
+            else:
+                if DEBUG:  # If we have had a successful read, update the emulated data too
+                    self.emulated_readable_pins[pin] = value
         else:
             logging.error("ERROR: Interface not connected. Cannot read value of pin #%s." % (pin,))
+            if DEBUG:  # Simulate the correct value if reading pin has failed.
+                try:
+                    return self.emulated_readable_pins[pin]
+                except KeyError:  # TypeErrors occur when the emulated dict isn't passed in
+                    pass
         return value
     
     def pulse_on(self, pin, duration_ms=100):
@@ -403,7 +463,7 @@ class BaseRaspiHomeDevice(object):
         NB: This is BLOCKING for the duration. Run in a thread if the duration is long.
         
         @param pin: <int> The pin to change
-        @keyword duration: <int> How long the pulse should be in ms
+        @param duration_ms: <int> How long the pulse should be in ms
         """
         self.write(pin, 1)
         sleep(duration_ms/1000.0)
@@ -720,7 +780,7 @@ def get_matching_pids(name, exclude_self=True):
     """
     # Get all matching PIDs
     try:
-        pids_str = subprocess.check_output(["pidof",name])
+        pids_str = subprocess.check_output(["pidof", name])
     except subprocess.CalledProcessError:  # No matches
         pids_str = ""
     # Process string-list into python list

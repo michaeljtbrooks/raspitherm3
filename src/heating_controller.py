@@ -16,6 +16,7 @@ import logging
 import pigpio
 from time import sleep
 
+from config import DEBUG
 from utils import BaseRaspiHomeDevice, TemperatureHumiditySensor
 
 logging.basicConfig(format='[%(asctime)s RASPITHERM] %(message)s', datefmt='%H:%M:%S',level=logging.INFO)
@@ -42,10 +43,12 @@ class HeatingController(BaseRaspiHomeDevice):
     _PULSE_DURATION_MS = 200  # How long a toggle pulse should be (milliseconds)
     _RELAY_DELAY_MS = 200  # How long to wait before rechecking the status after a toggle (enough time for relay to switch) 
     
-    def __init__(self, config, interface=None):
+    def __init__(self, config, interface=None, emulated_readable_pins=None, registry=None):
         """
         Sets this up
         """
+        super(HeatingController, self).__init__(registry=registry, emulated_readable_pins=emulated_readable_pins)
+
         self.iface = self.get_or_build_interface(config=config, interface=interface)
         
         # Outputs
@@ -70,13 +73,15 @@ class HeatingController(BaseRaspiHomeDevice):
                 self.iface.set_pull_up_down(self._CH_TOGGLE_PIN, pigpio.PUD_OFF)
                 self.iface.set_pull_up_down(self._HW_STATUS_PIN, pigpio.PUD_OFF)
                 self.iface.set_pull_up_down(self._CH_STATUS_PIN, pigpio.PUD_OFF)
-                if self._TH_SENSOR_PIN and self._TH_SENSOR_TYPE:
+                if (self._TH_SENSOR_PIN or DEBUG) and self._TH_SENSOR_TYPE:  # The sensor will emulate in development mode
                     self.iface.set_mode(self._TH_SENSOR_PIN, pigpio.INPUT)
                     self.add_temp_humidity_interface(pin_id=self._TH_SENSOR_PIN, sensor_type=self._TH_SENSOR_TYPE)
             except (AttributeError, IOError, pigpio.error) as e:
                 print(("ERROR: Cannot configure pins hw={},{} ch={},{}: {}".format(self._HW_TOGGLE_PIN, self._HW_STATUS_PIN, self._CH_TOGGLE_PIN, self._CH_STATUS_PIN, e)))
         else:
             print("ERROR: Interface not connected. Cannot configure pins.")
+            if DEBUG:  # We will still emulate the
+                self.add_temp_humidity_interface(pin_id=self._TH_SENSOR_PIN, sensor_type=self._TH_SENSOR_TYPE)
             
         # Now set internal vars to initial state:
         self.check_status()
@@ -190,6 +195,8 @@ class HeatingController(BaseRaspiHomeDevice):
         current_value = self.check_hw()
         intended_value = self.human_bool(value)
         self.pulse_if_different(current=current_value, intended=intended_value, output_pin=self._HW_TOGGLE_PIN, duration_ms=self._PULSE_DURATION_MS)
+        if DEBUG:
+            self.emulated_readable_pins[self._HW_STATUS_PIN] = intended_value
         sleep(self._RELAY_DELAY_MS/1000.0)
         return self.check_status()  # Actually measure the result!
 
@@ -200,6 +207,8 @@ class HeatingController(BaseRaspiHomeDevice):
         current_value = self.check_ch()
         intended_value = self.human_bool(value)
         self.pulse_if_different(current=current_value, intended=intended_value, output_pin=self._CH_TOGGLE_PIN, duration_ms=self._PULSE_DURATION_MS)
+        if DEBUG:
+            self.emulated_readable_pins[self._CH_STATUS_PIN] = intended_value
         sleep(self._RELAY_DELAY_MS/1000.0)
         return self.check_status()  # Actually measure the result!
 

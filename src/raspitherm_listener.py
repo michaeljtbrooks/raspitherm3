@@ -17,6 +17,10 @@
 """
 import sys
 import os
+from decimal import Decimal
+
+import simplejson as simplejson
+import six
 
 # Add some gymnastics so we can use imports relative to the parent dir.
 my_dir = os.path.dirname(os.path.realpath(__file__)) #The directory we're running in
@@ -62,11 +66,16 @@ class RaspithermControlResource(Resource):
         ("status", "status"),
     )
     
-    def __init__(self, *args, **kwargs):
+    def __init__(self, registry=None, *args, **kwargs):
         """
         @TODO: perform LAN discovery, interrogate the resources, generate controls for all of them
         """
-        self.heating_controller = HeatingController(CONFIG_SETTINGS)
+        if registry is None:
+            self.__class__.registry = {}   # Class-wide storage if not already init'd
+            registry = self.__class__.registry
+        self.registry = registry
+        self.emulated_readable_pins = kwargs.pop("emulated_readable_pins", None) or {}  # You can pass in a shared dict so vars can be shared across states
+        self.heating_controller = HeatingController(CONFIG_SETTINGS, emulated_readable_pins=self.emulated_readable_pins, registry=registry)
         Resource.__init__(self, *args, **kwargs) #Super
         #Add in the static folder
         static_folder = os.path.join(RASPILED_DIR, "static")
@@ -141,9 +150,26 @@ class RaspithermControlResource(Resource):
             th_available = 0
             th_temp_c = "20"
             th_humidity = "50"
+            th_temp_c_readable = ""
+            th_humidity_readable = ""
         else:  # Success
             th_style = ""
             th_available = 1
+            try:
+                th_temp_c_readable = "{:.1f}".format(Decimal(th_temp_c))
+            except (TypeError, ValueError):
+                th_temp_c_readable = "??"
+            try:
+                th_humidity_readable = "{:.0f}".format(Decimal(th_humidity))
+            except (TypeError, ValueError):
+                th_humidity_readable = "??"
+
+        # Read our latest temperature target:
+        target_temperature = self.registry.get("target_temperature")
+        try:
+            target_temperature_readable = "{:.0f}".format(Decimal(target_temperature))
+        except (ValueError, TypeError):
+            target_temperature_readable = "--"
 
         # JSON action - Return a JSON object if a result:
         if _action_result is not None or return_json:
@@ -156,11 +182,16 @@ class RaspithermControlResource(Resource):
                 "ch": ch_status,
                 "th_available": th_available,
                 "th_style": th_style,
-                "th_temp_c": th_temp_c,
-                "th_humidity": th_humidity
+                "th_temp_c": six.ensure_text(th_temp_c),
+                "th_temp_c_readable": six.ensure_text(th_temp_c_readable),
+                "th_humidity_readable": six.ensure_text(th_humidity_readable),
+                "th_humidity": six.ensure_text(th_humidity),
+                "target_temperature": target_temperature,
+                "target_temperature_readable": target_temperature_readable,
+                "debug": int(DEBUG)
             }
             try:
-                return bytes(json.dumps(json_data), encoding="utf-8", errors="ignore")
+                return bytes(simplejson.dumps(json_data), encoding="utf-8", errors="ignore")
             except Exception as e:
                 err_msg = "Error: {} - {}".format(e.__class__.__name__, e)
                 return err_msg.encode("utf-8")
@@ -179,7 +210,11 @@ class RaspithermControlResource(Resource):
                 th_available=th_available,
                 th_style=th_style,
                 th_temp_c=th_temp_c,
-                th_humidity=th_humidity
+                th_humidity=th_humidity,
+                th_temp_c_readable=th_temp_c_readable,
+                th_humidity_readable=th_humidity_readable,
+                target_temperature=target_temperature,
+                target_temperature_readable=target_temperature_readable,
             ).encode('utf-8')
     
     def action__hw(self, request):
@@ -228,8 +263,13 @@ class RaspithermControlSite(Site, object):
     """
     Site thread which initialises the RaspithermControlResource properly
     """
+    emulated_readable_pins = {}  # Class-wide, shared. For debugging
+    registry = {}  # Class-wide, shared. For storing data
+
     def __init__(self, *args, **kwargs):
-        resource = kwargs.pop("resource", RaspithermControlResource())
+        resource = kwargs.pop("resource", None)
+        if resource is None:
+            resource = RaspithermControlResource(emulated_readable_pins=self.__class__.emulated_readable_pins, registry=self.__class__.registry)
         super(RaspithermControlSite, self).__init__(resource=resource, requestFactory=SmartRequest, *args, **kwargs)
     
     def stopFactory(self):

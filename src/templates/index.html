@@ -32,9 +32,14 @@
                     <span class="slideswitch round"></span>
                 </label>
                 <div id="central_heating_thermostat" style="{th_style}" data-th-available="{th_available}">
-                    <span id="central_heating_temperature_display" class="temperature_display">{th_temp_c}</span> <span class="temperature_units">&deg;C</span>
+                    <span id="central_heating_temperature_display" class="temperature_display">{th_temp_c_readable}</span><span class="temperature_units">&deg;C</span>
+                    <span id="central_heating_humidity_display" class="humidity_display">{th_humidity_readable}</span><span class="humidity_units">%</span>
+
                     <label id="central_heating_temperature_target" style="display: none;">
-                        <span class="temperature_arrow">&#9654;</span> <span id="central_heating_temperature_target_display" class="temperature_display">--</span> <span class="temperature_units">&deg;C</span>
+                        <br>
+                        <span class="temperature_arrow">&#9660;</span>
+                        <br>
+                        <span id="central_heating_temperature_target_display" class="temperature_display">--</span> <span class="temperature_units">&deg;C</span>
                         <br>
                         <input type="range" min="5" max="30" value="{th_temp_c}" id="central_heating_temperature_target_slider" list="target_temperature_tickmarks" step="1">
                         <datalist id="target_temperature_tickmarks">
@@ -46,6 +51,7 @@
                             <option value="30" label="30"></option>
                         </datalist>
                     </label>
+
                 </div>
             </div>
 

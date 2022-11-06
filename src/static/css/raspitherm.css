@@ -3,7 +3,6 @@
 body {
 	font-family: "Trebuchet MS", "Trebuchet", Arial, Helvetica, "Liberation Sans", "Sans", sans-serif;
     font-size: 10pt;
-    font-size: 1.0rem;
     background: #f8f8f8;
 }
 h1, h2, h3, h4 {
@@ -50,6 +49,7 @@ a{
     flex-direction: row;
     align-items: center;
     padding-bottom: 1em;
+    flex-wrap: wrap;
 }
 .controls .icon img {
     padding-right: 3em;
@@ -137,9 +137,16 @@ input:checked + .slideswitch:before {
     margin-left: 1em;
 }
 
-.temperature_display {
-    font-size: 1.8rem;
+.humidity_display {
+    font-size: 1rem;
     color: #202020;
+    width: 5em;
+}
+
+.temperature_display {
+    font-size: 2rem;
+    color: #202020;
+    width: 5em;
 }
 
 .temperature_arrow {
@@ -148,7 +155,7 @@ input:checked + .slideswitch:before {
     margin: 0 0.25em;
 }
 
-.temperature_units {
+.temperature_units, .humidity_units {
     font-size: 1rem;
     color: #aaa;
 }
