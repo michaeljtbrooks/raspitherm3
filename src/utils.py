@@ -546,6 +546,31 @@ class BaseRaspiHomeDevice(object):
         self.iface = PiPinInterface(params)
         return self.iface
 
+    def get_data(self, key, default=NOT_SET):
+        """
+        Pulls a certain piece of data from the registry, uses copy() to prevent changing data if pulling mutable types.
+        """
+        try:
+            item = self.registry[key]
+        except KeyError:
+            return copy.copy(default)
+        return copy.copy(item)
+
+    def __getitem__(self, key):
+        item = self.get_data(key)
+        if item is NOT_SET:
+            raise KeyError("{} not found in data registry.".format(key))
+        return item
+
+    def set_data(self, key, value):
+        """
+        Sets an item in the registry. Will be frozen in time thanks to copy()
+        """
+        self.registry[key] = copy.copy(value)
+
+    def __setitem__(self, key, value):
+        self.set_data(key, value)
+
 
 class ProgrammeScheduleEvent(object):
     """

@@ -165,33 +165,34 @@ class RaspithermControlResource(Resource):
                 th_humidity_readable = "??"
 
         # Read our latest temperature target:
-        target_temperature = self.registry.get("target_temperature")
+        target_temperature = self.heating_controller.get_data("target_temperature")
         try:
             target_temperature_readable = "{:.0f}".format(Decimal(target_temperature))
         except (ValueError, TypeError):
             target_temperature_readable = "--"
 
+        # Build our context dict which is common to both JS and html
+        context_dict = {
+            "hw_status_js": hw_status_js,
+            "ch_status_js": ch_status_js,
+            "hw_status": hw_status,
+            "ch_status": ch_status,
+            "hw": hw_status,
+            "ch": ch_status,
+            "th_available": th_available,
+            "th_temp_c": six.ensure_text(th_temp_c),
+            "th_temp_c_readable": six.ensure_text(th_temp_c_readable),
+            "th_humidity_readable": six.ensure_text(th_humidity_readable),
+            "th_humidity": six.ensure_text(th_humidity),
+            "target_temperature": target_temperature,
+            "target_temperature_readable": target_temperature_readable,
+            "debug": int(DEBUG)
+        }
+
         # JSON action - Return a JSON object if a result:
         if _action_result is not None or return_json:
-            json_data = {
-                "hw_status_js": hw_status_js,
-                "ch_status_js": ch_status_js,
-                "hw_status": hw_status,
-                "ch_status": ch_status,
-                "hw": hw_status,
-                "ch": ch_status,
-                "th_available": th_available,
-                "th_style": th_style,
-                "th_temp_c": six.ensure_text(th_temp_c),
-                "th_temp_c_readable": six.ensure_text(th_temp_c_readable),
-                "th_humidity_readable": six.ensure_text(th_humidity_readable),
-                "th_humidity": six.ensure_text(th_humidity),
-                "target_temperature": target_temperature,
-                "target_temperature_readable": target_temperature_readable,
-                "debug": int(DEBUG)
-            }
             try:
-                return bytes(simplejson.dumps(json_data), encoding="utf-8", errors="ignore")
+                return bytes(simplejson.dumps(context_dict), encoding="utf-8", errors="ignore")
             except Exception as e:
                 err_msg = "Error: {} - {}".format(e.__class__.__name__, e)
                 return err_msg.encode("utf-8")
@@ -200,6 +201,11 @@ class RaspithermControlResource(Resource):
         request.setHeader("Content-Type", "text/html; charset=utf-8")
         with open(RASPILED_DIR+'/templates/index.html', "r") as web_template:
             htmlstr = web_template.read()  # Reads en bloc. More preferable to line by line concatenation
+        context_dict.update(
+            hw_checked_attr=hw_checked_attr,
+            ch_checked_attr=ch_checked_attr,
+            th_style=th_style
+        )
         return htmlstr.format(
                 hw_status=hw_status,
                 hw_status_js=hw_status_js,
