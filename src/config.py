@@ -80,6 +80,12 @@ class NotSet(object):
     def __nonzero__(cls):
         return False
 
+    def toJson(self):
+        """
+        Ensures this generates a Null
+        """
+        return "null"
+
 
 NOT_SET = NotSet()
 
