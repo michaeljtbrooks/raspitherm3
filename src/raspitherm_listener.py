@@ -36,7 +36,6 @@ except ImportError:
     #python3
     from urllib.parse import urlencode
 import logging
-import json
 
 from twisted.internet import reactor, endpoints, protocol, task
 from twisted.web.resource import Resource
@@ -180,10 +179,10 @@ class RaspithermControlResource(Resource):
             "hw": hw_status,
             "ch": ch_status,
             "th_available": th_available,
-            "th_temp_c": six.ensure_text(th_temp_c),
-            "th_temp_c_readable": six.ensure_text(th_temp_c_readable),
-            "th_humidity_readable": six.ensure_text(th_humidity_readable),
-            "th_humidity": six.ensure_text(th_humidity),
+            "th_temp_c": six.text_type(th_temp_c),
+            "th_temp_c_readable": six.text_type(th_temp_c_readable),
+            "th_humidity_readable": six.text_type(th_humidity_readable),
+            "th_humidity": six.text_type(th_humidity),
             "target_temperature": target_temperature,
             "target_temperature_readable": target_temperature_readable,
             "debug": int(DEBUG)
