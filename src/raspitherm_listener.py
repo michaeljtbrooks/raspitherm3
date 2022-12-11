@@ -164,7 +164,7 @@ class RaspithermControlResource(Resource):
                 th_humidity_readable = "??"
 
         # Read our latest temperature target:
-        target_temperature = self.heating_controller.get_data("target_temperature")
+        target_temperature = self.heating_controller.get_data("target_temperature", default=None)
         try:
             target_temperature_readable = "{:.0f}".format(Decimal(target_temperature))
         except (ValueError, TypeError):
