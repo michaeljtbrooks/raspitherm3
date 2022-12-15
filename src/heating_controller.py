@@ -77,7 +77,7 @@ class HeatingController(BaseRaspiHomeDevice):
                 self.iface.set_pull_up_down(self._CH_STATUS_PIN, pigpio.PUD_OFF)
                 if (self._TH_SENSOR_PIN or DEBUG) and self._TH_SENSOR_TYPE:  # The sensor will emulate in development mode
                     self.iface.set_mode(self._TH_SENSOR_PIN, pigpio.INPUT)
-                    self.add_temp_humidity_interface(pin_id=self._TH_SENSOR_PIN, sensor_type=self._TH_SENSOR_TYPE)
+                    self.add_temp_humidity_interface(pin_id=self._TH_SENSOR_PIN, sensor_type=self._TH_SENSOR_TYPE, sensor_power_pin=self._TH_SENSOR_POWER_PIN)
                     if self._TH_SENSOR_POWER_PIN:
                         self.iface.set_mode(self._TH_SENSOR_POWER_PIN, pigpio.OUTPUT)
                         self.iface.set_pull_up_down(self._TH_SENSOR_POWER_PIN, pigpio.PUD_OFF)  # We use a hardware pull-up
@@ -125,13 +125,13 @@ class HeatingController(BaseRaspiHomeDevice):
             out["th"] = self.th
         return out
 
-    def add_temp_humidity_interface(self, pin_id=None, sensor_type=None):
+    def add_temp_humidity_interface(self, pin_id=None, sensor_type=None, sensor_power_pin=None):
         """
         Add in the pigpio_dht powered interface
         """
         if pin_id is None:
             print("Error: Cannot add a temperature/humidity sensor, no pin number supplied.")
-        self.iface_temp_humid = TemperatureHumiditySensor(gpio=pin_id, mode=sensor_type, pigpio_interface=self.iface)
+        self.iface_temp_humid = TemperatureHumiditySensor(gpio=pin_id, mode=sensor_type, pigpio_interface=self.iface, sensor_power_pin=sensor_power_pin)
         self.iface_temp_humid.read_non_blocking(delay=5.0)  # Perform first read after enough time has passed for sensor to initialise
         return self.iface_temp_humid
 
