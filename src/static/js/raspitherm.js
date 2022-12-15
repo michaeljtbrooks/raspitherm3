@@ -96,13 +96,14 @@ function update_heating_ui_controls(current_hardware_settings){
     }
     $central_heating_temperature_display.html(current_temp_str);
 
+    // Future set temperature work.
     // IF central heating is off, hide the slider and target temp
-    let $central_heating_target_temp_container = $("#central_heating_temperature_target");
-    if(ch_actual_status === "off"){
-        $central_heating_target_temp_container.hide();
-    } else {
-        $central_heating_target_temp_container.show();
-    }
+    // let $central_heating_target_temp_container = $("#central_heating_temperature_target");
+    // if(ch_actual_status === "off"){
+    //    $central_heating_target_temp_container.hide();
+    // } else {
+    //    $central_heating_target_temp_container.show();
+    // }
 
 }
 $.fn.extend({

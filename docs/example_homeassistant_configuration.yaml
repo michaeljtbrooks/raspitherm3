@@ -1,0 +1,102 @@
+# Example configuration.yaml entries for automating with Homeassistant
+# This assumes your Raspberry Pi is set to 192.168.0.233. Change to the IP address you are actually using.
+rest_command:
+  raspitherm_hot_water:
+    url: "http://192.168.0.233:9090/?hw={{ hw_state }}"
+    method: GET
+  raspitherm_central_heating:
+    url: "http://192.168.0.233:9090/?ch={{ ch_state }}"
+    method: GET
+
+
+switch:
+  - platform: template
+    switches:
+      raspitherm_hw_switch:
+        friendly_name: "Hot water"
+        value_template: "{{ state_attr('sensor.raspitherm_status', 'hw') == 'on' }}"
+        turn_on:
+          - service: rest_command.raspitherm_hot_water
+            data:
+              hw_state: "on"
+          - delay: 0.5
+          - service: homeassistant.update_entity
+            entity_id: sensor.raspitherm_status
+        turn_off:
+          - service: rest_command.raspitherm_hot_water
+            data:
+              hw_state: "off"
+          - delay: 0.5
+          - service: homeassistant.update_entity
+            entity_id: sensor.raspitherm_status
+      raspitherm_ch_switch:
+        friendly_name: "Central heating"
+        value_template: "{{ state_attr('sensor.raspitherm_status', 'ch') == 'on' }}"
+        turn_on:
+          - service: rest_command.raspitherm_central_heating
+            data:
+              ch_state: "on"
+          - delay: 0.5
+          - service: homeassistant.update_entity
+            entity_id: sensor.raspitherm_status
+        turn_off:
+          - service: rest_command.raspitherm_central_heating
+            data:
+              ch_state: "off"
+          - delay: 0.5
+          - service: homeassistant.update_entity
+            entity_id: sensor.raspitherm_status
+
+sensor:
+  - name: raspitherm_status
+    platform: rest
+    resource: http://192.168.0.233:9090/?status=
+    scan_interval: 30
+    json_attributes:
+      - hw_status_js
+      - hw_status
+      - ch_status_js
+      - ch_status
+      - hw
+      - ch
+      - th_available
+      - th_temp_c
+      - th_temp_f
+      - th_humidity
+      - th_style
+    # If you wish to use Fahrenheit, swap th_temp_c to th_temp_f, then modify the raspitherm_temperature and thermostat_main temperatures below
+    value_template: >- 
+      {% if value_json.th_available %}
+        {{ value_json.th_temp_c }}°C   {{ value_json.th_humidity}}%
+      {% else %}
+        hw:{{ value_json.hw_status }}, ch:{{value_json.ch_status}}
+      {% endif %}
+
+# And we read that last sensor again to create a virtual sensor with just the temperature
+template:
+  - sensor:
+    - name: raspitherm_temperature
+      # If you wish to use Fahrenheit, swap th_temp_c with the th_temp_f attribute here.
+      state: "{{ states.sensor.raspitherm_status.attributes.th_temp_c|float(19.9) }}"
+
+# Thermostat: https://www.home-assistant.io/integrations/generic_thermostat/
+climate:
+  - platform: generic_thermostat
+    name: Thermostat
+    unique_id: thermostat_main
+    heater: switch.raspitherm_ch_switch
+    target_sensor: sensor.raspitherm_temperature
+    # These values refer to Celsius. If you wish to use Fahrenheit, adjust these values to suit e.g. precision 0.5, target_temp_step 1, min 41, max 76
+    precision: 0.1
+    target_temp_step: 0.5
+    target_temp: 15.0
+    min_temp: 5.0
+    max_temp: 24.0
+    cold_tolerance: 0.5
+    hot_tolerance: 0.1
+    # Preset modes = ['none', 'away', 'comfort', 'home', 'sleep', 'activity'],
+    home_temp: 20.0
+    away_temp: 10.0
+    comfort_temp: 21.0
+    sleep_temp: 15.0
+    activity_temp: 17.0

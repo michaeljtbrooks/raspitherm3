@@ -39,6 +39,7 @@ class HeatingController(BaseRaspiHomeDevice):
     _HW_STATUS_PIN = 22
     _CH_STATUS_PIN = 27
     _TH_SENSOR_PIN = None  # Temperature humidity sensor pin
+    _TH_SENSOR_POWER_PIN = None  # Temperature humidity sensor power pin (to help reset a crashed sensor)
     _TH_SENSOR_TYPE = "DHT11"  # Temperature humidity sensor type (DHT11 or DHT22)
     _PULSE_DURATION_MS = 200  # How long a toggle pulse should be (milliseconds)
     _RELAY_DELAY_MS = 200  # How long to wait before rechecking the status after a toggle (enough time for relay to switch) 
@@ -61,6 +62,7 @@ class HeatingController(BaseRaspiHomeDevice):
         self._CH_STATUS_PIN = config.get("ch_status_pin", self._CH_STATUS_PIN)
         self._TH_SENSOR_PIN = config.get("th_sensor_pin", self._TH_SENSOR_PIN)
         self._TH_SENSOR_TYPE = config.get("th_sensor_type", self._TH_SENSOR_TYPE)
+        self._TH_SENSOR_POWER_PIN = config.get("th_sensor_power_pin", self._TH_SENSOR_POWER_PIN)
         
         # Configure pins (we are using hardware pull-down resistors, so turn the internals off):
         if self.iface.connected:
@@ -76,11 +78,25 @@ class HeatingController(BaseRaspiHomeDevice):
                 if (self._TH_SENSOR_PIN or DEBUG) and self._TH_SENSOR_TYPE:  # The sensor will emulate in development mode
                     self.iface.set_mode(self._TH_SENSOR_PIN, pigpio.INPUT)
                     self.add_temp_humidity_interface(pin_id=self._TH_SENSOR_PIN, sensor_type=self._TH_SENSOR_TYPE)
+                    if self._TH_SENSOR_POWER_PIN:
+                        self.iface.set_mode(self._TH_SENSOR_POWER_PIN, pigpio.OUTPUT)
+                        self.iface.set_pull_up_down(self._TH_SENSOR_POWER_PIN, pigpio.PUD_OFF)  # We use a hardware pull-up
+                        self.iface.write(self._TH_SENSOR_POWER_PIN, pigpio.ON)  # Power up that sensor!!
+
             except (AttributeError, IOError, pigpio.error) as e:
-                print(("ERROR: Cannot configure pins hw={},{} ch={},{}: {}".format(self._HW_TOGGLE_PIN, self._HW_STATUS_PIN, self._CH_TOGGLE_PIN, self._CH_STATUS_PIN, e)))
+                print(
+                    (
+                        "ERROR: Cannot configure pins hw={},{} ch={},{} th={} hw_pwr={}: {}".format(
+                            self._HW_TOGGLE_PIN, self._HW_STATUS_PIN,
+                            self._CH_TOGGLE_PIN, self._CH_STATUS_PIN,
+                            self._TH_SENSOR_PIN, self._TH_SENSOR_POWER_PIN,
+                            e
+                        )
+                    )
+                )
         else:
             print("ERROR: Interface not connected. Cannot configure pins.")
-            if DEBUG:  # We will still emulate the
+            if DEBUG:  # We will still emulate the temperature sensor
                 self.add_temp_humidity_interface(pin_id=self._TH_SENSOR_PIN, sensor_type=self._TH_SENSOR_TYPE)
             
         # Now set internal vars to initial state:

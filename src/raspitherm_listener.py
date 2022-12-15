@@ -142,14 +142,17 @@ class RaspithermControlResource(Resource):
         th = self.heating_controller.check_th()
         try:
             th_temp_c = th["temp_c"]
+            th_temp_f = th["temp_f"]
             th_humidity = th["humidity"]
         except (KeyError, AttributeError, TypeError):  # Failure
             th = {}
             th_style = "display: none;"  # Hidden
             th_available = 0
             th_temp_c = "20"
+            th_temp_f = "68"
             th_humidity = "50"
             th_temp_c_readable = ""
+            th_temp_f_readable = ""
             th_humidity_readable = ""
         else:  # Success
             th_style = ""
@@ -158,6 +161,10 @@ class RaspithermControlResource(Resource):
                 th_temp_c_readable = "{:.1f}".format(Decimal(th_temp_c))
             except (TypeError, ValueError):
                 th_temp_c_readable = "??"
+            try:
+                th_temp_f_readable = "{:.1f}".format(Decimal(th_temp_f))
+            except (TypeError, ValueError):
+                th_temp_f_readable = "??"
             try:
                 th_humidity_readable = "{:.0f}".format(Decimal(th_humidity))
             except (TypeError, ValueError):
@@ -181,6 +188,8 @@ class RaspithermControlResource(Resource):
             "th_available": th_available,
             "th_temp_c": six.text_type(th_temp_c),
             "th_temp_c_readable": six.text_type(th_temp_c_readable),
+            "th_temp_f": six.text_type(th_temp_f),
+            "th_temp_f_readable": six.text_type(th_temp_f_readable),
             "th_humidity_readable": six.text_type(th_humidity_readable),
             "th_humidity": six.text_type(th_humidity),
             "target_temperature": target_temperature,

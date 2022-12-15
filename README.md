@@ -21,7 +21,13 @@ Raspitherm is a Python based controller for heating programmers. It allows you t
 7. [Pigpio](http://abyz.me.uk/rpi/pigpio/index.html) to provide you with software pulse width modulation
 8. 2 x 100R (one hundred ohm) current limiting resistors for input channel optoisolator LEDs
 9. 2 x 500R (five hundred ohm) current limiting resistors for output channel optoisolators
-10. 4 x 47k pull-down resistors 
+10. 4 x 47k pull-down resistors
+
+#### Optional requirements ####
+11. DHT11 or DHT22 sensor
+12. A third 3.3v compatible MOSFET if you want to be able to reset the temperature / humidity sensor
+13. A fifth 47k resistor as a hardware pull-up if you want to be able to reset the temperature / humidity sensor
+14. A 100nf (0.1µF) capacitor to remove any noise that gets onto the temperature sensor power line
 
 
 ### Hardware circuitry ###
@@ -35,6 +41,16 @@ Each input channel is monitoring the voltage across an indicator LED on the prog
 Each output channel is emulating a button press. It switches an optoisolator on which shorts one side of the manual override button to its other side (thus emulating a button press).
 
 Therefore you need a heating programmer that has indicator LEDs, and manual on/off toggle buttons. You need to tap the programmer's PCB.
+
+You should specify the GPIO pins you are using in the config.py file.
+
+#### Update Dec 2022: ####
+I've added an optional temperature and humidity sensor. The code works with DHT11 and DHT22 sensors. The sensor needs its own GPIO input pin to read the data line of the chip.
+
+DHT11 and DHT22 sensors are notorious for locking up after several hours, which is why I've also included a bit of circuitry and code to reset the sensor if it starts timing out.
+You will need another GPIO pin set up as output, which switches another MOSFET on to provide power to the temperature sensor. When the code detects a misbehaving sensor, it
+will cut the power to the temperature for 20 seconds, forcing the sensor to reset. It will then be readable again until the next lockup.
+
 
 
 ### Software Installation - automatic ###
@@ -109,11 +125,14 @@ e.g. assuming you installed it in the /opt directory
 
 Practically idiot-proof! Click the radiator switch to turn the central heating on and off. Click the tap (faucet) switch to turn the hot water heating on and off.
 
+If you have a temperature sensor attached, you'll see the last known temperature and humidity with each page refresh.
+
 
 ### That's it! ###
 Feel free to download the code, dick about with it, make something awesome. I am trying to create a home automation empire out of Raspberry Pis. You are very welcome to contribute.
 
 Here are some ideas for improvements:
+* Interfacing to Homeassistant
 * Time based controls: You could set your programmer to have no on/off signals at all, then have the Raspberry Pi control it all (might need realtime clock if precision is your thing or the ntp daemon isn't working)
 * Antipatory heating: The Raspberry Pi could download a weather forecast and fire up the heating only on the days when you are at home and it's likely to be cold
 * Smart thermostat: Use a digital thermometer input to measure the temperature in the house, and use this to drive the Raspberry Pi's heating control

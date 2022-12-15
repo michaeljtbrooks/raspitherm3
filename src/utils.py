@@ -218,18 +218,23 @@ class TemperatureHumiditySensor(object):
     iface = None
     pigpio_interface = None
     gpio_pin = 20
+    sensor_power_pin = None
     mode = 11
     lockout_secs = 10
     async_read_thread = None
+    async_reset_thread = None
     last_data = None
     last_query_time = None
+    n_timeouts_since_last_successful_read = 0
 
-    def __init__(self, gpio=gpio_pin, mode=mode, pigpio_interface=None, *args, **kwargs):
+    def __init__(self, gpio=gpio_pin, mode=mode, pigpio_interface=None, sensor_power_pin=None, *args, **kwargs):
         """
         Bind the correct interface
         :param gpio: The pin this sensor is available on
         :param mode: The mode we're in (either DHT11 or DHT22)
         :param pigpio_interface: <Pigpio> Reuse this Pigpio interface if desired
+        :param sensor_power_pin: <int> If set, is the pin which turns on and off the DHT sensor's power
+                                 used to reset the thing if it misbehaves
         """
         self.mode = mode
         if mode in (1, 11, "1", "11", "DHT11"):
@@ -239,6 +244,7 @@ class TemperatureHumiditySensor(object):
             self.iface_class = DHT22
             self.lockout_secs = 5
         self.gpio_pin = gpio
+        self.sensor_power_pin = sensor_power_pin or self.sensor_power_pin
         self.pigpio_interface = pigpio_interface
 
     def get_mode_str(self):
@@ -281,10 +287,11 @@ class TemperatureHumiditySensor(object):
         """
         Attempts to get the temperature
 
+        BLOCKING
+
         :param iface: The interface class instance. Required when calling read() in threads. Otherwise fetches from self.
         :param delay: <float> how many seconds to pause before actually trying to read the sensor
         """
-        # print("read(): iface={}".format(iface))
         now = datetime.datetime.now()
         query_again = True
         if self.last_query_time:
@@ -307,14 +314,54 @@ class TemperatureHumiditySensor(object):
                     latest_temp_humidity = iface.read(retries=3)  # Blocking!!
                 except TimeoutError:
                     logging.warning("{}.read(): Sensor timeout, pin {}!".format(self.__class__.__name__, self.gpio_pin))
-                    return self.last_data or {}
+                    self.n_timeouts_since_last_successful_read += 1
+                    if self.n_timeouts_since_last_successful_read >= 21:
+                        logging.warning("Too many sensor timeouts. I give up!")
+                        self.last_data = {}
+                        return self.last_data
+                    elif self.n_timeouts_since_last_successful_read >= 3 and self.sensor_power_pin:
+                        logging.info("Temperature sensor has crashed... Resetting via pin %s!" % self.sensor_power_pin)
+                        self.reset_sensor(iface=iface)  # Blocking
+                        # After a reset, let's try to read it again
+                        try:
+                            latest_temp_humidity = iface.read(retries=2)  # Blocking!!
+                        except TimeoutError:
+                            logging.warning("Last reset attempt appeared to be unsuccessful.")
+                            return self.last_data or {}
+                    else:
+                        return self.last_data or {}
             if latest_temp_humidity.get("valid"):  # Only return a value if it is valid!
+                self.n_timeouts_since_last_successful_read = 0
                 self.last_data = latest_temp_humidity or {}
                 self.last_data["query_timestamp"] = now
                 self.last_query_time = now
                 print(latest_temp_humidity)
                 return self.last_data
         return self.last_data
+
+    def reset_sensor(self, iface=None):
+        """
+        Kills power to the sensor, reinstates power, thus resetting it.
+
+        BLOCKING
+
+        :param iface: The interface class instance. Required when calling read() in threads. Otherwise fetches from self.
+        """
+        # Only perform a reset if there is a sensor power pin
+        if not self.sensor_power_pin:
+            print("\treset_sensor(): There is no reset pin configured. Ignoring reset request.")
+            return None
+
+        if iface is None:  # Necessary workaround to stop threads from spinning up another interface
+            iface = self.get_interface()
+        print("\tPowering sensor off for 20 seconds...")
+        iface.write(self.sensor_power_pin, pigpio.OFF)  # Off you go, twat.
+        sleep(20)  # Enough time to let capacitors discharge
+        print("\tPowering sensor back on...")
+        iface.write(self.sensor_power_pin, pigpio.ON)  # Back on
+        print("\tPause for 5 seconds to let it initialise...")
+        sleep(5)  # Enough time to let the temperature sensor initialise
+        return True
 
     def _development_emulate_sensor_read(self):
         """
@@ -348,15 +395,16 @@ class TemperatureHumiditySensor(object):
         Attempts to read the sensor, updates self.last_data without blocking.
         :param delay: <float> how many seconds to pause before actually trying to read the sensor
         """
-        # print("read_non_blocking(): self.iface={}".format(self.iface))
         async_thread_is_running = False
         if self.async_read_thread and self.async_read_thread.is_alive():
             async_thread_is_running = True
         if not async_thread_is_running:
             self.async_read_thread = threading.Thread(target=self.read, kwargs={"iface": self.iface, "delay": delay})
             self.async_read_thread.start()
+            return True
         else:
             print("\tread_non_blocking(): A read is already taking place. Ignoring duplicate call.")
+            return None
 
     read_async = read_non_blocking  # alias
 
@@ -393,6 +441,8 @@ class TemperatureHumiditySensor(object):
         """
         if self.async_read_thread:
             self.async_read_thread.join(timeout=3.0)
+        if self.async_reset_thread:
+            self.async_reset_thread.join(timeout=2.0)
 
 
 class BaseRaspiHomeDevice(object):
