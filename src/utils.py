@@ -315,11 +315,11 @@ class TemperatureHumiditySensor(object):
                 except TimeoutError:
                     logging.warning("{}.read(): Sensor timeout, pin {}! Reset power pin {}".format(self.__class__.__name__, self.gpio_pin, self.sensor_power_pin))
                     self.n_timeouts_since_last_successful_read += 1
-                    if self.n_timeouts_since_last_successful_read >= 21:
+                    if self.n_timeouts_since_last_successful_read >= 16:
                         logging.warning("Too many sensor timeouts. I give up!")
                         self.last_data = {}
                         return self.last_data
-                    elif self.n_timeouts_since_last_successful_read >= 3 and self.sensor_power_pin:
+                    elif self.n_timeouts_since_last_successful_read >= 2 and self.sensor_power_pin:
                         logging.info("Temperature sensor has crashed... Resetting via pin %s!" % self.sensor_power_pin)
                         self.reset_sensor(iface=iface)  # Blocking
                         # After a reset, let's try to read it again
@@ -352,13 +352,11 @@ class TemperatureHumiditySensor(object):
             print("\treset_sensor(): There is no reset pin configured. Ignoring reset request.")
             return None
 
-        if iface is None:  # Necessary workaround to stop threads from spinning up another interface
-            iface = self.get_interface()
         print("\tPowering sensor off for 20 seconds...")
-        iface.write(self.sensor_power_pin, pigpio.OFF)  # Off you go, twat.
+        self.pigpio_interface.write(self.sensor_power_pin, pigpio.OFF)  # Off you go, twat.
         sleep(20)  # Enough time to let capacitors discharge
         print("\tPowering sensor back on...")
-        iface.write(self.sensor_power_pin, pigpio.ON)  # Back on
+        self.pigpio_interface.write(self.sensor_power_pin, pigpio.ON)  # Back on
         print("\tPause for 5 seconds to let it initialise...")
         sleep(5)  # Enough time to let the temperature sensor initialise
         return True
