@@ -313,13 +313,13 @@ class TemperatureHumiditySensor(object):
                 try:
                     latest_temp_humidity = iface.read(retries=3)  # Blocking!!
                 except TimeoutError:
-                    logging.warning("{}.read(): Sensor timeout, pin {}!".format(self.__class__.__name__, self.gpio_pin))
-                    self.n_timeouts_since_last_successful_read += 1
-                    if self.n_timeouts_since_last_successful_read >= 21:
+                    logging.warning("{}.read(): Sensor timeout, pin {}! Reset power pin {}".format(self.__class__.__name__, self.gpio_pin, self.sensor_power_pin))
+                    self.__class__.n_timeouts_since_last_successful_read += 1
+                    if self.__class__.n_timeouts_since_last_successful_read >= 21:
                         logging.warning("Too many sensor timeouts. I give up!")
                         self.last_data = {}
                         return self.last_data
-                    elif self.n_timeouts_since_last_successful_read >= 3 and self.sensor_power_pin:
+                    elif self.__class__.n_timeouts_since_last_successful_read >= 3 and self.sensor_power_pin:
                         logging.info("Temperature sensor has crashed... Resetting via pin %s!" % self.sensor_power_pin)
                         self.reset_sensor(iface=iface)  # Blocking
                         # After a reset, let's try to read it again
@@ -331,7 +331,7 @@ class TemperatureHumiditySensor(object):
                     else:
                         return self.last_data or {}
             if latest_temp_humidity.get("valid"):  # Only return a value if it is valid!
-                self.n_timeouts_since_last_successful_read = 0
+                self.__class__.n_timeouts_since_last_successful_read = 0
                 self.last_data = latest_temp_humidity or {}
                 self.last_data["query_timestamp"] = now
                 self.last_query_time = now
