@@ -8,7 +8,7 @@
 import copy
 import datetime
 import random
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 import six
 from dateutil.relativedelta import relativedelta
@@ -24,6 +24,7 @@ from pigpio_dht import DHT11, DHT22
 from twisted.web.server import Request
 
 from src.config import NOT_SET, get_current_timezone, DEBUG
+
 
 logging.basicConfig(format='[%(asctime)s RASPIhome] %(message)s', datefmt='%H:%M:%S', level=logging.INFO)
 
@@ -226,6 +227,7 @@ class TemperatureHumiditySensor(object):
     last_data = None
     last_query_time = None
     n_timeouts_since_last_successful_read = 0
+    MAX_BELIEVABLE_CHANGE_IN_TEMPERATURE_PER_MINUTE = Decimal("6.5")  # Absolute change. i.e. +/-6.5 degrees per minute either way will count.
 
     def __init__(self, gpio=gpio_pin, mode=mode, pigpio_interface=None, sensor_power_pin=None, *args, **kwargs):
         """
@@ -283,6 +285,35 @@ class TemperatureHumiditySensor(object):
         print("\tTemperature/Humidity {} sensor added on pin {}.".format(self.iface_class.__name__, gpio))
         return self.iface
 
+    def check_data_just_read_is_realistic(self, data_just_read, read_datetime):
+        """
+        Calculate the delta-T and if it's clearly bonkers, suppress the read.
+        """
+        read_datetime = read_datetime or datetime.datetime.now()
+        try:
+            latest_temperature = Decimal(data_just_read.get("temp_c"))
+        except (AttributeError, KeyError, ValueError, TypeError):
+            # If there is no latest data, then it ain't real.
+            return False
+        try:
+            previous_temperature = Decimal(self.last_data["temp_c"])
+            previous_query_timestamp = self.last_data["query_timestamp"]
+        except (AttributeError, KeyError, ValueError, TypeError):
+            # If there is no prior data, but there is current data, then believe it
+            return True
+        # Calculate delta:
+        try:
+            time_interval_timedelta = read_datetime - previous_query_timestamp
+            time_interval_seconds = Decimal(time_interval_timedelta.total_seconds() or 1)
+            delta_t = latest_temperature - previous_temperature
+            delta_t_per_minute = Decimal(delta_t) / (time_interval_seconds / Decimal("60"))
+            # Only believe temperature swings of less than +/-6.5 degrees C per minute.
+            if abs(delta_t_per_minute) > abs(Decimal(self.MAX_BELIEVABLE_CHANGE_IN_TEMPERATURE_PER_MINUTE)):
+                return False
+        except (ValueError, TypeError, AttributeError, InvalidOperation) as e:
+            logging.exception("Unable to calculate the delta-t: %s", e)
+        return True  # Assume all good
+
     def read(self, iface=None, delay=0.0):
         """
         Attempts to get the temperature
@@ -322,7 +353,7 @@ class TemperatureHumiditySensor(object):
                     elif self.n_timeouts_since_last_successful_read >= 2 and self.sensor_power_pin:
                         logging.info("Temperature sensor has crashed... Resetting via pin %s!" % self.sensor_power_pin)
                         self.reset_sensor(iface=iface)  # Blocking
-                        # After a reset, let's try to read it again
+                        # After a reset, let's try to read it again...
                         try:
                             latest_temp_humidity = iface.read(retries=2)  # Blocking!!
                         except TimeoutError:
@@ -331,10 +362,15 @@ class TemperatureHumiditySensor(object):
                     else:
                         return self.last_data or {}
             if latest_temp_humidity.get("valid"):  # Only return a value if it is valid!
+                self.last_query_time = now  # We have successfully polled it here. We don't want to hammer the sensor, even if it spat out bollocks.
+                # Bail if it's clearly not a sensible temperature.
+                if not self.check_data_just_read_is_realistic(data_just_read=latest_temp_humidity, read_datetime=now):
+                    logging.warning("Latest temperature (%s) is likely to be nonsense. Ignoring it.", latest_temp_humidity.get("temp_c", "?"))
+                    self.n_timeouts_since_last_successful_read += 1  # Treat as a failing sensor.
+                    return self.last_data or {}
                 self.n_timeouts_since_last_successful_read = 0
                 self.last_data = latest_temp_humidity or {}
                 self.last_data["query_timestamp"] = now
-                self.last_query_time = now
                 print(latest_temp_humidity)
                 return self.last_data
         return self.last_data

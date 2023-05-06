@@ -298,7 +298,7 @@ def start_if_not_running():
     Checks if the process is running, if not, starts it!
     """
     pids = get_matching_pids(APP_NAME, exclude_self=True) #Will remove own PID
-    pids = list(filter(bool,pids))
+    pids = list(filter(bool, pids))
     if not pids: #No match! Implies we need to fire up the listener
         logging.info("[STARTING] Raspitherm Listener with PID {}".format(os.getpid()))
     
