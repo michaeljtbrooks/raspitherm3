@@ -486,7 +486,7 @@ class WaterTemperatureSensor(object):
     """
     base_dir = "/sys/bus/w1/devices"
     device_prefix = "28-"
-    MAX_BELIEVABLE_CHANGE_IN_TEMPERATURE_PER_MINUTE = Decimal("6.5")
+    MAX_BELIEVABLE_CHANGE_IN_TEMPERATURE_PER_MINUTE = Decimal("13.0")  # Very rapid changes get ignored. This sensor is much less noisy compared to DHT11 so we can be less restrictive.
 
     def __init__(self, gpio_pin=0):
         self.gpio_pin = gpio_pin
@@ -809,7 +809,7 @@ class ProgrammeScheduleEvent(object):
         day_part = self._day_names[self.when_weekday]
         try:
             start_part = self.when_time_start.strftime("%H:%M")
-        except (AttributeError, TypeError, ValueError):
+        except (AttributeError, TypeError, ValueError):MAX_BELIEVABLE_CHANGE_IN_TEMPERATURE_PER_MINUTE
             start_part = ""
         try:
             end_part = self.when_time_end.strftime("%H:%M")
