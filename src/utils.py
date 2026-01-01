@@ -64,7 +64,7 @@ class SmartRequest(Request, object):
     """
     The class for request objects returned by our web server.
         This child version has methods for easily grabbing params safely.
-    
+    6.5
         Usage:
             #If you just want the first value
             sunset = request["sunset"]
@@ -809,7 +809,7 @@ class ProgrammeScheduleEvent(object):
         day_part = self._day_names[self.when_weekday]
         try:
             start_part = self.when_time_start.strftime("%H:%M")
-        except (AttributeError, TypeError, ValueError):MAX_BELIEVABLE_CHANGE_IN_TEMPERATURE_PER_MINUTE
+        except (AttributeError, TypeError, ValueError):
             start_part = ""
         try:
             end_part = self.when_time_end.strftime("%H:%M")
