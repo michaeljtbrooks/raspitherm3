@@ -540,6 +540,10 @@ class WaterTemperatureSensor(object):
                 if len(parts) < 2:
                     return None
                 temp_c = Decimal(parts[1]) / Decimal("1000")
+                try:  # Round to 1dp. Any more precision is stupidity
+                    temp_c = temp_c.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+                except (InvalidOperation, AttributeError):
+                    pass
         except (OSError, ValueError, InvalidOperation) as e:
             logging.warning("WaterTemperatureSensor._read_raw_temperature(): unable to read: %s", e)
             return None
