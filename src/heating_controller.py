@@ -17,7 +17,7 @@ import pigpio
 from time import sleep
 
 from config import DEBUG
-from utils import BaseRaspiHomeDevice, TemperatureHumiditySensor
+from utils import BaseRaspiHomeDevice, TemperatureHumiditySensor, WaterTemperatureSensor
 
 logging.basicConfig(format='[%(asctime)s RASPITHERM] %(message)s', datefmt='%H:%M:%S',level=logging.INFO)
 
@@ -30,8 +30,10 @@ class HeatingController(BaseRaspiHomeDevice):
     hw = 0  # Current status of hot water
     ch = 0  # Current status of central heating
     th = None  # Current temp and humidity
+    hw_temp = None  # Current hot water temperature
     iface = None  # General Pigpio interface
     iface_temp_humid = None  # Humidity temperature sensor interface  (could expand this into multiples in future)
+    iface_hw_temp = None  # Hot water temperature sensor interface (DS18B20)
 
     # Pins
     _HW_TOGGLE_PIN = 5 
@@ -41,6 +43,7 @@ class HeatingController(BaseRaspiHomeDevice):
     _TH_SENSOR_PIN = None  # Temperature humidity sensor pin
     _TH_SENSOR_POWER_PIN = None  # Temperature humidity sensor power pin (to help reset a crashed sensor)
     _TH_SENSOR_TYPE = "DHT11"  # Temperature humidity sensor type (DHT11 or DHT22)
+    _HW_TEMP_SENSOR_PIN = 0  # Hot water temperature sensor pin (DS18B20 - w1)
     _PULSE_DURATION_MS = 200  # How long a toggle pulse should be (milliseconds)
     _RELAY_DELAY_MS = 200  # How long to wait before rechecking the status after a toggle (enough time for relay to switch) 
     
@@ -63,6 +66,7 @@ class HeatingController(BaseRaspiHomeDevice):
         self._TH_SENSOR_PIN = config.get("th_sensor_pin", self._TH_SENSOR_PIN)
         self._TH_SENSOR_TYPE = config.get("th_sensor_type", self._TH_SENSOR_TYPE)
         self._TH_SENSOR_POWER_PIN = config.get("th_sensor_power_pin", self._TH_SENSOR_POWER_PIN)
+        self._HW_TEMP_SENSOR_PIN = config.get("hw_temp_sensor_pin", self._HW_TEMP_SENSOR_PIN)
         
         # Configure pins (we are using hardware pull-down resistors, so turn the internals off):
         if self.iface.connected:
@@ -98,6 +102,10 @@ class HeatingController(BaseRaspiHomeDevice):
             print("ERROR: Interface not connected. Cannot configure pins.")
             if DEBUG:  # We will still emulate the temperature sensor
                 self.add_temp_humidity_interface(pin_id=self._TH_SENSOR_PIN, sensor_type=self._TH_SENSOR_TYPE)
+
+        # Configure the DS18B20 interface if requested
+        if self._HW_TEMP_SENSOR_PIN:
+            self.add_hw_temp_interface(pin_id=self._HW_TEMP_SENSOR_PIN)
             
         # Now set internal vars to initial state:
         self.check_status()
@@ -123,6 +131,16 @@ class HeatingController(BaseRaspiHomeDevice):
         }
         if self.get_has_temp_humidity_sensor() and self.th:
             out["th"] = self.th
+            out["th_available"] = 1
+        else:
+            out["th_available"] = 0
+        if self.get_has_hw_temp_sensor() and self.hw_temp:
+            out["hw_temp"] = self.hw_temp
+            out["hw_temp_c"] = self.hw_temp.get("temp_c")
+            out["hw_temp_f"] = self.hw_temp.get("temp_f")
+            out["hw_temp_available"] = 1
+        else:
+            out["hw_temp_available"] = 0
         return out
 
     def add_temp_humidity_interface(self, pin_id=None, sensor_type=None, sensor_power_pin=None):
@@ -192,6 +210,39 @@ class HeatingController(BaseRaspiHomeDevice):
         if self.iface_temp_humid:
             return self.read_temp_humidity(use_cache=True) or {}
         return {}
+
+    def add_hw_temp_interface(self, pin_id=None):
+        """
+        Add in the DS18B20-powered interface (via the kernel w1 interface).
+        """
+        if pin_id is None:
+            logging.warning("Cannot add a hot water temperature sensor; no pin number supplied.")
+            return None
+        self.iface_hw_temp = WaterTemperatureSensor(gpio_pin=pin_id)
+        return self.iface_hw_temp
+
+    def get_has_hw_temp_sensor(self):
+        """
+        Return True if a water temperature sensor exists or is configured.
+        """
+        return bool(self.iface_hw_temp)
+
+    def read_hw_temp(self):
+        """
+        Read the hot water temperature sensor.
+        """
+        if not self.iface_hw_temp:
+            return {}
+        return self.iface_hw_temp.read()
+
+    def check_hw_temp(self):
+        """
+        Reads water temperature with caching of last known good value.
+        """
+        if self.iface_hw_temp:
+            self.hw_temp = self.read_hw_temp() or self.hw_temp
+            return self.hw_temp or {}
+        return {}
     
     def check_status(self):
         """
@@ -201,6 +252,7 @@ class HeatingController(BaseRaspiHomeDevice):
         self.check_ch()
         self.check_hw()
         self.check_th()
+        self.check_hw_temp()
         return self.status    
     
     def set_hw(self, value):

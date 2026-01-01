@@ -479,6 +479,133 @@ class TemperatureHumiditySensor(object):
             self.async_reset_thread.join(timeout=2.0)
 
 
+class WaterTemperatureSensor(object):
+    """
+    Represents a single-wire water temperature sensor (e.g. DS18B20).
+    Uses the kernel w1 device interface, and holds on to the last believable value.
+    """
+    base_dir = "/sys/bus/w1/devices"
+    device_prefix = "28-"
+    MAX_BELIEVABLE_CHANGE_IN_TEMPERATURE_PER_MINUTE = Decimal("6.5")
+
+    def __init__(self, gpio_pin=0):
+        self.gpio_pin = gpio_pin
+        self.device_path = None
+        self.last_data = {}
+        self.last_query_time = None
+        self.detect_sensor()
+
+    def detect_sensor(self):
+        """
+        Locates a DS18B20-compatible device exposed via the w1 kernel interface.
+        """
+        if not os.path.isdir(self.base_dir):
+            logging.debug("WaterTemperatureSensor.detect_sensor(): no w1 devices directory %s", self.base_dir)
+            return None
+        try:
+            device_dirs = [d for d in os.listdir(self.base_dir) if d.startswith(self.device_prefix)]
+        except OSError as e:
+            logging.warning("WaterTemperatureSensor.detect_sensor(): unable to list w1 devices: %s", e)
+            return None
+        for device_dir in device_dirs:
+            candidate_path = os.path.join(self.base_dir, device_dir)
+            temperature_file = os.path.join(candidate_path, "temperature")
+            legacy_file = os.path.join(candidate_path, "w1_slave")
+            if os.path.exists(temperature_file) or os.path.exists(legacy_file):
+                self.device_path = candidate_path
+                return self.device_path
+        return None
+
+    def _read_raw_temperature(self):
+        """
+        Reads the raw temperature in degrees Celsius from the w1 device files.
+        """
+        if not self.device_path:
+            self.detect_sensor()
+        if not self.device_path:
+            return None
+        temperature_file = os.path.join(self.device_path, "temperature")
+        legacy_file = os.path.join(self.device_path, "w1_slave")
+        try:
+            if os.path.exists(temperature_file):
+                with open(temperature_file, "r") as fh:
+                    raw_str = fh.read().strip()
+                temp_c = Decimal(raw_str) / Decimal("1000")
+            else:
+                with open(legacy_file, "r") as fh:
+                    lines = fh.readlines()
+                if len(lines) < 2 or "YES" not in lines[0]:
+                    return None
+                parts = lines[1].strip().split("t=")
+                if len(parts) < 2:
+                    return None
+                temp_c = Decimal(parts[1]) / Decimal("1000")
+        except (OSError, ValueError, InvalidOperation) as e:
+            logging.warning("WaterTemperatureSensor._read_raw_temperature(): unable to read: %s", e)
+            return None
+        return temp_c
+
+    def check_data_just_read_is_realistic(self, data_just_read, read_datetime):
+        """
+        Suppresses implausible readings (huge swings in very short time).
+        """
+        read_datetime = read_datetime or datetime.datetime.now()
+        try:
+            latest_temperature = Decimal(data_just_read.get("temp_c"))
+        except (AttributeError, KeyError, ValueError, TypeError):
+            return False
+        try:
+            previous_temperature = Decimal(self.last_data["temp_c"])
+            previous_query_timestamp = self.last_data["query_timestamp"]
+        except (AttributeError, KeyError, ValueError, TypeError):
+            return True
+        try:
+            time_interval_timedelta = read_datetime - previous_query_timestamp
+            time_interval_seconds = Decimal(time_interval_timedelta.total_seconds() or 1)
+            delta_t = latest_temperature - previous_temperature
+            delta_t_per_minute = Decimal(delta_t) / (time_interval_seconds / Decimal("60"))
+            if abs(delta_t_per_minute) > abs(Decimal(self.MAX_BELIEVABLE_CHANGE_IN_TEMPERATURE_PER_MINUTE)):
+                return False
+        except (ValueError, TypeError, AttributeError, InvalidOperation) as e:
+            logging.exception("WaterTemperatureSensor unable to calculate delta-t: %s", e)
+        return True
+
+    def read(self):
+        """
+        Reads the current water temperature, returning the latest believable value.
+        """
+        now = datetime.datetime.now()
+        temp_c = self._read_raw_temperature()
+        if temp_c is None:
+            return self.last_data or {}
+        latest_data = {
+            "temp_c": temp_c,
+            "temp_f": (temp_c * Decimal("9") / Decimal("5")) + Decimal("32"),
+            "valid": True,
+            "query_timestamp": now,
+            "source_pin": self.gpio_pin
+        }
+        if not self.check_data_just_read_is_realistic(latest_data, read_datetime=now):
+            logging.warning("Latest water temperature (%s) is likely to be nonsense. Ignoring it.", latest_data.get("temp_c", "?"))
+            return self.last_data or {}
+        self.last_data = latest_data
+        self.last_query_time = now
+        return self.last_data
+
+    def read_last_result(self):
+        """
+        Returns the last known result without polling the sensor.
+        """
+        return self.last_data or {}
+
+    def __bool__(self):
+        return bool(self.device_path or self.gpio_pin)
+
+    def teardown(self):
+        # Nothing to tear down for w1 sensors, but kept for parity.
+        return True
+
+
 class BaseRaspiHomeDevice(object):
     """
     A base class for building subclasses to control devices from a Raspberry pi

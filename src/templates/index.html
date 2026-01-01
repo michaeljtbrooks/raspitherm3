@@ -9,7 +9,7 @@
         <script>
             //Initialise our heating controls to correct settings
             $(document).ready(function(e){{
-                $.fn.update_heating_ui_controls({{"ch":"{ch_status}", "hw":"{hw_status}", "th_temp_c": "{th_temp_c}", "th_available": "{th_available}", "th_humidity": "{th_humidity}"}});
+                $.fn.update_heating_ui_controls({{"ch":"{ch_status}", "hw":"{hw_status}", "th_temp_c": "{th_temp_c}", "th_available": "{th_available}", "th_humidity": "{th_humidity}", "hw_temp_c": "{hw_temp_c}", "hw_temp_available": "{hw_temp_available}"}});
             }});
         </script>
     </head>
@@ -64,6 +64,9 @@
                     <input class="toggle_checkbox" type="checkbox" data-keyname="hw" {hw_checked_attr}>
                     <span class="slideswitch round"></span>
                 </label>
+                <div id="hot_water_temperature" class="hot_water_temperature" style="{hw_temp_style}" data-hw-temp-available="{hw_temp_available}">
+                    <span id="hot_water_temperature_display" class="temperature_display">{hw_temp_c_readable}</span><span class="temperature_units">&deg;C</span>
+                </div>
             </div>
 
         </div>
