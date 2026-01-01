@@ -137,6 +137,10 @@ input:checked + .slideswitch:before {
     margin-left: 1em;
 }
 
+.hot_water_temperature {
+    margin-left: 1em;
+}
+
 .humidity_display {
     font-size: 1rem;
     color: #202020;
@@ -163,4 +167,3 @@ input:checked + .slideswitch:before {
 input[type="range"]{
     width: 10rem;
 }
-

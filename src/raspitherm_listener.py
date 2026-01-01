@@ -170,6 +170,23 @@ class RaspithermControlResource(Resource):
             except (TypeError, ValueError):
                 th_humidity_readable = "??"
 
+        # Hot water temperature
+        hw_temp = self.heating_controller.check_hw_temp()
+        try:
+            hw_temp_c = hw_temp["temp_c"]
+        except (KeyError, AttributeError, TypeError):
+            hw_temp_style = "display: none;"
+            hw_temp_available = 0
+            hw_temp_c = ""
+            hw_temp_c_readable = ""
+        else:
+            hw_temp_style = ""
+            hw_temp_available = 1
+            try:
+                hw_temp_c_readable = "{:.1f}".format(Decimal(hw_temp_c))
+            except (TypeError, ValueError):
+                hw_temp_c_readable = "??"
+
         # Read our latest temperature target:
         target_temperature = self.heating_controller.get_data("target_temperature", default=None)
         try:
@@ -192,6 +209,9 @@ class RaspithermControlResource(Resource):
             "th_temp_f_readable": six.text_type(th_temp_f_readable),
             "th_humidity_readable": six.text_type(th_humidity_readable),
             "th_humidity": six.text_type(th_humidity),
+            "hw_temp_available": hw_temp_available,
+            "hw_temp_c_readable": six.text_type(hw_temp_c_readable),
+            "hw_temp_c": six.text_type(hw_temp_c),
             "target_temperature": target_temperature,
             "target_temperature_readable": target_temperature_readable,
             "debug": int(DEBUG)
@@ -212,7 +232,8 @@ class RaspithermControlResource(Resource):
         context_dict.update(
             hw_checked_attr=hw_checked_attr,
             ch_checked_attr=ch_checked_attr,
-            th_style=th_style
+            th_style=th_style,
+            hw_temp_style=hw_temp_style
         )
         return htmlstr.format(
                 hw_status=hw_status,
@@ -227,6 +248,10 @@ class RaspithermControlResource(Resource):
                 th_humidity=th_humidity,
                 th_temp_c_readable=th_temp_c_readable,
                 th_humidity_readable=th_humidity_readable,
+                hw_temp_available=hw_temp_available,
+                hw_temp_style=hw_temp_style,
+                hw_temp_c=hw_temp_c,
+                hw_temp_c_readable=hw_temp_c_readable,
                 target_temperature=target_temperature,
                 target_temperature_readable=target_temperature_readable,
             ).encode('utf-8')
@@ -256,7 +281,10 @@ class RaspithermControlResource(Resource):
         return self.heating_controller.check_status()
 
     def has_sensors_to_poll(self):
-        return bool(self.heating_controller.get_has_temp_humidity_sensor())
+        return bool(
+            self.heating_controller.get_has_temp_humidity_sensor()
+            or self.heating_controller.get_has_hw_temp_sensor()
+        )
 
     def poll_sensors(self):
         """
@@ -264,6 +292,8 @@ class RaspithermControlResource(Resource):
         """
         if self.heating_controller.get_has_temp_humidity_sensor():
             self.heating_controller.read_temp_humidity(use_cache=True)
+        if self.heating_controller.get_has_hw_temp_sensor():
+            self.heating_controller.read_hw_temp()
             # TODO: implement target-temperature central heating control response.
 
     def teardown(self):
@@ -317,4 +347,3 @@ def start_if_not_running():
 
 if __name__ == "__main__":
     start_if_not_running()
-

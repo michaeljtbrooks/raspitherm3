@@ -44,6 +44,7 @@ DEFAULTS = {
         'relay_delay_ms': 200,  # How long it takes for the relays to be thrown
         'sensor_polling_period_seconds': 60,
         'th_sensor_pin': 0,
+        'hw_temp_sensor_pin': 0,
         'th_sensor_type': "DHT11",
         'th_sensor_power_pin': 0,
         'debug': 0  # Must be lower case!

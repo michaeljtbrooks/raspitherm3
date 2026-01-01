@@ -79,7 +79,8 @@ function update_heating_ui_controls(current_hardware_settings){
 	let debug = current_hardware_settings["debug"] || 0;
     let ch_actual_status = current_hardware_settings["ch"] || "off";
 	let hw_actual_status = current_hardware_settings["hw"] || "off";
-	let th_available = current_hardware_settings["th_available"] || 0;
+	let th_available = Number(current_hardware_settings["th_available"] || 0);
+    let hw_temp_available = Number(current_hardware_settings["hw_temp_available"] || 0);
 
 	let $ch_container = $("#central_heating");
 	let $hw_container = $("#hot_water");
@@ -93,8 +94,28 @@ function update_heating_ui_controls(current_hardware_settings){
     let current_temp_str = "--"
     if(th_available) {
         current_temp_str = current_hardware_settings["th_temp_c"] || "--";
+        if(!current_temp_str && current_hardware_settings["th"]){
+            current_temp_str = current_hardware_settings["th"]["temp_c"] || "--";
+        }
     }
     $central_heating_temperature_display.html(current_temp_str);
+
+    // Hot water temperature (DS18B20)
+    let $hot_water_temperature_container = $("#hot_water_temperature");
+    let $hot_water_temperature_display = $("#hot_water_temperature_display");
+    if(!hw_temp_available && current_hardware_settings["hw_temp"]){
+        hw_temp_available = 1;
+    }
+    if(hw_temp_available){
+        let hw_temp_value = current_hardware_settings["hw_temp_c"] || "--";
+        if(hw_temp_value === "--" && current_hardware_settings["hw_temp"]){
+            hw_temp_value = current_hardware_settings["hw_temp"]["temp_c"] || "--";
+        }
+        $hot_water_temperature_container.show();
+        $hot_water_temperature_display.html(hw_temp_value);
+    } else {
+        $hot_water_temperature_container.hide();
+    }
 
     // Future set temperature work.
     // IF central heating is off, hide the slider and target temp
@@ -168,4 +189,3 @@ $(document).ready(function(){
     });
 
 });
-
