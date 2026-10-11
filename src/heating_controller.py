@@ -12,7 +12,10 @@
     The actual Raspberry Pi controller class wrapper
 """
 
+import datetime
 import logging
+from decimal import Decimal, InvalidOperation
+
 import pigpio
 from time import sleep
 
@@ -46,6 +49,18 @@ class HeatingController(BaseRaspiHomeDevice):
     _HW_TEMP_SENSOR_PIN = 0  # Hot water temperature sensor pin (DS18B20 - w1)
     _PULSE_DURATION_MS = 200  # How long a toggle pulse should be (milliseconds)
     _RELAY_DELAY_MS = 200  # How long to wait before rechecking the status after a toggle (enough time for relay to switch) 
+
+    # Freeze protection: an intrinsic failsafe in case Home Assistant falls over
+    _FREEZE_PROTECTION_TEMP_C = Decimal("7")  # Room temperature floor. None = disabled
+    FREEZE_PROTECTION_HYSTERESIS_C = Decimal("3")  # Heat until floor + this (i.e. 10 degrees C)
+    FREEZE_PROTECTION_TRIGGER_DURATION = datetime.timedelta(minutes=5)  # Must be below the floor for this long...
+    FREEZE_PROTECTION_TRIGGER_MIN_READS = 5  # ...and for this many consecutive reads, so it's not just a noisy sensor
+    FREEZE_PROTECTION_MAX_RUN_TIME = datetime.timedelta(hours=1)
+    FREEZE_PROTECTION_MIN_SENSOR_MAX_AGE = datetime.timedelta(minutes=5)  # Readings older than this mean sensor isn't responding
+    freeze_protection_active_since = None  # Datetime when freeze protection turned the heating on
+    _freeze_cold_since = None  # Timestamp of first read in the current run of reads below the floor
+    _n_freeze_cold_reads = 0  # Number of consecutive reads below the floor
+    _freeze_last_read_timestamp = None  # So we only count each sensor read once
     
     def __init__(self, config, interface=None, emulated_readable_pins=None, registry=None):
         """
@@ -67,6 +82,11 @@ class HeatingController(BaseRaspiHomeDevice):
         self._TH_SENSOR_TYPE = config.get("th_sensor_type", self._TH_SENSOR_TYPE)
         self._TH_SENSOR_POWER_PIN = config.get("th_sensor_power_pin", self._TH_SENSOR_POWER_PIN)
         self._HW_TEMP_SENSOR_PIN = config.get("hw_temp_sensor_pin", self._HW_TEMP_SENSOR_PIN)
+
+        # Freeze protection
+        self._FREEZE_PROTECTION_TEMP_C = self.parse_freeze_protection_temp_c(config.get("freeze_protection_temp_c", self._FREEZE_PROTECTION_TEMP_C))
+        polling_period = datetime.timedelta(seconds=config.get("sensor_polling_period_seconds", 60))
+        self._freeze_protection_sensor_max_age = max(self.FREEZE_PROTECTION_MIN_SENSOR_MAX_AGE, polling_period * 3)
         
         # Configure pins (we are using hardware pull-down resistors, so turn the internals off):
         if self.iface.connected:
@@ -119,6 +139,23 @@ class HeatingController(BaseRaspiHomeDevice):
                      b"off", b"OFF", b"-", b"low", b"0", b"LOW", b"L", b"False", b"false", b"None", b"null"):
             return 0
         return bool(value)
+
+    @classmethod
+    def parse_freeze_protection_temp_c(cls, value):
+        """
+        Returns the freeze protection floor as a Decimal, or None if freeze protection is disabled
+        """
+        try:
+            return Decimal(str(value).strip())
+        except (ValueError, TypeError, InvalidOperation):
+            logging.warning("Freeze protection is DISABLED (freeze_protection_temp_c = '{}')".format(value))
+            return None
+
+    @property
+    def freeze_protection_target_temp_c(self):
+        if self._FREEZE_PROTECTION_TEMP_C is None:
+            return None
+        return self._FREEZE_PROTECTION_TEMP_C + self.FREEZE_PROTECTION_HYSTERESIS_C
     
     @property
     def status(self):
@@ -141,6 +178,8 @@ class HeatingController(BaseRaspiHomeDevice):
             out["hw_temp_available"] = 1
         else:
             out["hw_temp_available"] = 0
+        out["freeze_protection_active"] = int(bool(self.freeze_protection_active_since))
+        out["freeze_protection_since"] = self.freeze_protection_active_since
         return out
 
     def add_temp_humidity_interface(self, pin_id=None, sensor_type=None, sensor_power_pin=None):
@@ -270,7 +309,20 @@ class HeatingController(BaseRaspiHomeDevice):
 
     def set_ch(self, value):
         """
-        Turns the hot water to the value of mode
+        Turns the central heating to the value of mode, as commanded externally (web UI / Home Assistant).
+        External commands always take control back from freeze protection.
+        """
+        if self.freeze_protection_active_since:
+            self.stop_freeze_protection(
+                reason="external command to turn central heating {}".format(value),
+                switch_ch_off=False  # The command itself decides
+            )
+        self._reset_freeze_cold_streak()
+        return self._switch_ch(value)
+
+    def _switch_ch(self, value):
+        """
+        Turns the central heating to the value of mode
         """
         current_value = self.check_ch()
         intended_value = self.human_bool(value)
@@ -279,6 +331,91 @@ class HeatingController(BaseRaspiHomeDevice):
             self.emulated_readable_pins[self._CH_STATUS_PIN] = intended_value
         sleep(self._RELAY_DELAY_MS/1000.0)
         return self.check_status()  # Actually measure the result!
+
+    def _reset_freeze_cold_streak(self):
+        self._freeze_cold_since = None
+        self._n_freeze_cold_reads = 0
+
+    def _get_new_room_temperature(self, now):
+        """
+        Returns the room temperature as a Decimal if there has been a fresh sensor read since we last looked, else None
+        """
+        th = self.iface_temp_humid.read_last_result()
+        read_timestamp = th.get("query_timestamp")
+        if not read_timestamp or read_timestamp == self._freeze_last_read_timestamp:
+            return None
+        self._freeze_last_read_timestamp = read_timestamp
+        if now - read_timestamp > self._freeze_protection_sensor_max_age:
+            return None
+        try:
+            return Decimal(str(th["temp_c"]))
+        except (KeyError, ValueError, TypeError, InvalidOperation):
+            return None
+
+    def update_freeze_protection(self):
+        """
+        Failsafe in case Home Assistant falls over. If the room sensor is responding and has been below the floor
+        for long enough (and enough reads) to be believable, turn the central heating on until the room reaches
+        floor + hysteresis, or it has run for FREEZE_PROTECTION_MAX_RUN_TIME. Any external command takes control back.
+
+        Call this periodically (on each sensor poll). NOT from check_status() as it can switch the heating.
+        """
+        if self._FREEZE_PROTECTION_TEMP_C is None or not self.get_has_temp_humidity_sensor():
+            return False
+        now = datetime.datetime.now()
+        temp_c = self._get_new_room_temperature(now)
+
+        if self.freeze_protection_active_since:
+            if not self.check_ch():
+                # Something else switched it off (e.g. the programmer's own schedule or buttons). Don't fight it.
+                self.stop_freeze_protection(reason="central heating was switched off by something else", switch_ch_off=False)
+            elif temp_c is not None and temp_c >= self.freeze_protection_target_temp_c:
+                self.stop_freeze_protection(reason="room has reached {}°C".format(temp_c))
+            elif now - self.freeze_protection_active_since >= self.FREEZE_PROTECTION_MAX_RUN_TIME:
+                self.stop_freeze_protection(reason="maximum run time reached")
+            return True
+
+        # Not active: track how long the room has been below the floor
+        if temp_c is None:
+            last_read_timestamp = self._freeze_last_read_timestamp
+            if not last_read_timestamp or now - last_read_timestamp > self._freeze_protection_sensor_max_age:
+                self._reset_freeze_cold_streak()  # Sensor isn't responding. Don't trust the streak.
+            return False
+        if temp_c >= self._FREEZE_PROTECTION_TEMP_C:
+            self._reset_freeze_cold_streak()
+            return False
+        if self._freeze_cold_since is None:
+            self._freeze_cold_since = self._freeze_last_read_timestamp
+        self._n_freeze_cold_reads += 1
+        cold_for = self._freeze_last_read_timestamp - self._freeze_cold_since
+        if cold_for < self.FREEZE_PROTECTION_TRIGGER_DURATION or self._n_freeze_cold_reads < self.FREEZE_PROTECTION_TRIGGER_MIN_READS:
+            return False
+        if self.check_ch():  # Already heating, so nothing for us to do
+            return False
+        logging.warning(
+            "FREEZE PROTECTION ON: room below {}°C for {} ({} reads, now {}°C). Central heating on until {}°C, for at most {}.".format(
+                self._FREEZE_PROTECTION_TEMP_C, str(cold_for).split(".")[0], self._n_freeze_cold_reads, temp_c,
+                self.freeze_protection_target_temp_c, self.FREEZE_PROTECTION_MAX_RUN_TIME
+            )
+        )
+        status = self._switch_ch(1)
+        if not status.get("ch"):
+            logging.error("FREEZE PROTECTION: failed to turn central heating on! Will retry at next poll.")
+            return False
+        self.freeze_protection_active_since = now
+        self._reset_freeze_cold_streak()
+        return True
+
+    def stop_freeze_protection(self, reason="", switch_ch_off=True):
+        """
+        Ends freeze protection, optionally turning the central heating back off
+        """
+        ran_for = datetime.datetime.now() - self.freeze_protection_active_since
+        logging.warning("FREEZE PROTECTION OFF after {}: {}.".format(str(ran_for).split(".")[0], reason))
+        self.freeze_protection_active_since = None
+        self._reset_freeze_cold_streak()
+        if switch_ch_off:
+            self._switch_ch(0)
 
     def teardown(self):
         """

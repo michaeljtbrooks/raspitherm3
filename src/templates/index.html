@@ -1,15 +1,15 @@
 <html>
     <head>
         <title>Raspitherm</title>
-        <link rel="stylesheet" id="style" href="/static/css/raspitherm.css?20210110">
+        <link rel="stylesheet" id="style" href="/static/css/raspitherm.css?20261011">
         <script src="/static/js/jquery3.min.js"></script>
-        <script src="/static/js/raspitherm.js"></script>
+        <script src="/static/js/raspitherm.js?20261011"></script>
         <link rel="icon" href="/static/figs/raspitherm_favicon512.png">
         <!--[if IE]><link rel="shortcut icon" href="/static/figs/raspitherm_favicon16.png"><![endif]-->
         <script>
             //Initialise our heating controls to correct settings
             $(document).ready(function(e){{
-                $.fn.update_heating_ui_controls({{"ch":"{ch_status}", "hw":"{hw_status}", "th_temp_c": "{th_temp_c}", "th_available": "{th_available}", "th_humidity": "{th_humidity}", "hw_temp_c": "{hw_temp_c}", "hw_temp_available": "{hw_temp_available}"}});
+                $.fn.update_heating_ui_controls({{"ch":"{ch_status}", "hw":"{hw_status}", "th_temp_c": "{th_temp_c}", "th_available": "{th_available}", "th_humidity": "{th_humidity}", "hw_temp_c": "{hw_temp_c}", "hw_temp_available": "{hw_temp_available}", "freeze_protection_active": "{freeze_protection_active}", "freeze_protection_since": "{freeze_protection_since}", "freeze_protection_target_temp_c": "{freeze_protection_target_temp_c}"}});
             }});
         </script>
     </head>
@@ -18,6 +18,11 @@
 
         <div class="logo">
             <img src="/static/figs/raspitherm.svg" alt="Raspitherm">
+        </div>
+
+        <div id="freeze_protection" class="freeze_protection" style="{freeze_protection_style}">
+            &#10052; Freeze protection on since <span id="freeze_protection_since">{freeze_protection_since}</span>.
+            Heating until <span id="freeze_protection_target_temp_c">{freeze_protection_target_temp_c}</span>&deg;C.
         </div>
 
         <div id="controls" class="controls">

@@ -28,6 +28,7 @@ Raspitherm is a Python based controller for heating programmers. It allows you t
 12. A third 3.3v compatible MOSFET if you want to be able to reset the temperature / humidity sensor
 13. A fifth 47k resistor as a hardware pull-up if you want to be able to reset the temperature / humidity sensor
 14. A 100nf (0.1µF) capacitor to remove any noise that gets onto the temperature sensor power line
+15. A DS18b20 sensor for hot water tank temperature
 
 
 ### Hardware circuitry ###
@@ -51,6 +52,35 @@ DHT11 and DHT22 sensors are notorious for locking up after several hours, which 
 You will need another GPIO pin set up as output, which switches another MOSFET on to provide power to the temperature sensor. When the code detects a misbehaving sensor, it
 will cut the power to the temperature for 20 seconds, forcing the sensor to reset. It will then be readable again until the next lockup.
 
+In raspitherm.conf, set:
+th_sensor_type = <str> (DHT22 or DHT11)
+th_sensor_pin = <int>
+th_sensor_power_pin = <int>
+
+
+#### Update Feb 2026: ####
+I've added an optional temperature sensor for a hot water tank. The code works with ds18b20 sensors. 
+The sensor needs its own GPIO input pin to read the data line of the sensor. 
+
+ds18b20 are waterproof, but I've simply tunnelled it under the jacket insulation of the tank so it sits
+touching the cylinder.
+
+In raspitherm.conf, set:
+hw_temp_sensor_pin = <int>
+
+
+#### Update Oct 2026: ####
+DHT22s also have a habit of locking up and reporting a rigid 20.0°C. If the room sensor reports exactly 20.0°C for at
+least 10 minutes AND at least 10 consecutive reads, it gets power cycled via th_sensor_power_pin.
+
+Freeze protection: an intrinsic failsafe in case Home Assistant falls over. If the room sensor is responding and reads
+below freeze_protection_temp_c (default 7°C) for at least 5 minutes and 5 consecutive reads, Raspitherm turns the
+central heating on until the room reaches 3°C above that floor (i.e. 10°C), or for at most an hour. Any command to
+turn the central heating on or off (web UI / Home Assistant) takes back control immediately. Whilst active, it is shown
+on the web interface and reported as freeze_protection_active in the JSON status.
+
+In raspitherm.conf, set:
+freeze_protection_temp_c = <number> (or off to disable)
 
 
 ### Software Installation - automatic ###

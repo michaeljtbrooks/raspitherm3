@@ -137,6 +137,17 @@ input:checked + .slideswitch:before {
     margin-left: 1em;
 }
 
+.freeze_protection {
+    margin: 1em auto 0 auto;
+    padding: 0.5em 1em;
+    width: fit-content;
+    font-size: 1.2rem;
+    color: #0b4f8a;
+    background: #e3f0fb;
+    border: 2px solid #0b4f8a;
+    border-radius: 0.5em;
+}
+
 .hot_water_temperature {
     margin-left: 1em;
 }

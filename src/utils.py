@@ -8,7 +8,7 @@
 import copy
 import datetime
 import random
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 import six
 from dateutil.relativedelta import relativedelta
@@ -227,7 +227,13 @@ class TemperatureHumiditySensor(object):
     last_data = None
     last_query_time = None
     n_timeouts_since_last_successful_read = 0
+    stuck_sensor_since = None  # When the sensor started reporting STUCK_SENSOR_TEMPERATURE without variance
+    n_stuck_sensor_reads = 0  # How many consecutive successful reads have been STUCK_SENSOR_TEMPERATURE
     MAX_BELIEVABLE_CHANGE_IN_TEMPERATURE_PER_MINUTE = Decimal("6.5")  # Absolute change. i.e. +/-6.5 degrees per minute either way will count.
+    # DHT22s can lock up and report a rigid 20.0 degrees C. A power cycle cures this.
+    STUCK_SENSOR_TEMPERATURE = Decimal("20.0")
+    STUCK_SENSOR_MIN_DURATION = datetime.timedelta(minutes=10)
+    STUCK_SENSOR_MIN_READS = 10  # Sensor can be polled infrequently, so don't reset on just a couple of reads that happened to be 20.0
 
     def __init__(self, gpio=gpio_pin, mode=mode, pigpio_interface=None, sensor_power_pin=None, *args, **kwargs):
         """
@@ -372,8 +378,59 @@ class TemperatureHumiditySensor(object):
                 self.last_data = latest_temp_humidity or {}
                 self.last_data["query_timestamp"] = now
                 print(latest_temp_humidity)
+                if self.update_stuck_sensor_clock(data_just_read=self.last_data, read_datetime=now):
+                    return self.reset_stuck_sensor(iface=iface)  # Blocking
                 return self.last_data
         return self.last_data
+
+    def restart_stuck_sensor_clock(self):
+        """
+        Forget any run of stuck readings
+        """
+        self.stuck_sensor_since = None
+        self.n_stuck_sensor_reads = 0
+
+    def update_stuck_sensor_clock(self, data_just_read, read_datetime):
+        """
+        Track how long the sensor has been reporting exactly STUCK_SENSOR_TEMPERATURE.
+
+        :return: <bool> True if the sensor appears to have locked up
+        """
+        try:
+            temp_c = Decimal(str(data_just_read.get("temp_c")))
+        except (AttributeError, ValueError, TypeError, InvalidOperation):
+            return False
+        if temp_c != self.STUCK_SENSOR_TEMPERATURE:  # Any variance means the sensor is alive
+            self.restart_stuck_sensor_clock()
+            return False
+        if self.stuck_sensor_since is None:
+            self.stuck_sensor_since = read_datetime
+        self.n_stuck_sensor_reads += 1
+        return (
+            read_datetime - self.stuck_sensor_since >= self.STUCK_SENSOR_MIN_DURATION
+            and self.n_stuck_sensor_reads >= self.STUCK_SENSOR_MIN_READS
+        )
+
+    def reset_stuck_sensor(self, iface=None):
+        """
+        Power cycles a sensor which has locked up reporting STUCK_SENSOR_TEMPERATURE, then re-reads it.
+
+        BLOCKING
+        """
+        logging.warning(
+            "Temperature sensor has reported exactly %s°C for %s reads since %s. Assuming it has locked up.",
+            self.STUCK_SENSOR_TEMPERATURE, self.n_stuck_sensor_reads, self.stuck_sensor_since.strftime("%H:%M:%S")
+        )
+        self.restart_stuck_sensor_clock()
+        if not self.sensor_power_pin:
+            logging.warning("No sensor power pin configured, so cannot reset the stuck temperature sensor.")
+            return self.last_data
+        logging.info("Resetting stuck temperature sensor via pin %s!", self.sensor_power_pin)
+        self.reset_sensor(iface=iface)  # Blocking
+        # The stuck value is bogus, so don't show it or judge the next reading against it
+        self.last_data = {}
+        self.last_query_time = None
+        return self.read(iface=iface)
 
     def reset_sensor(self, iface=None):
         """
@@ -395,6 +452,7 @@ class TemperatureHumiditySensor(object):
         self.pigpio_interface.write(self.sensor_power_pin, pigpio.ON)  # Back on
         print("\tPause for 5 seconds to let it initialise...")
         sleep(5)  # Enough time to let the temperature sensor initialise
+        self.restart_stuck_sensor_clock()
         return True
 
     def _development_emulate_sensor_read(self):

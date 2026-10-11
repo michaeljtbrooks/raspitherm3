@@ -117,6 +117,16 @@ function update_heating_ui_controls(current_hardware_settings){
         $hot_water_temperature_container.hide();
     }
 
+    // Freeze protection
+    let $freeze_protection_container = $("#freeze_protection");
+    if(Number(current_hardware_settings["freeze_protection_active"] || 0)){
+        $("#freeze_protection_since").html(current_hardware_settings["freeze_protection_since"] || "");
+        $("#freeze_protection_target_temp_c").html(current_hardware_settings["freeze_protection_target_temp_c"] || "--");
+        $freeze_protection_container.show();
+    } else {
+        $freeze_protection_container.hide();
+    }
+
     // Future set temperature work.
     // IF central heating is off, hide the slider and target temp
     // let $central_heating_target_temp_container = $("#central_heating_temperature_target");

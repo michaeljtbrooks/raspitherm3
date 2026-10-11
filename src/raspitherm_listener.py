@@ -187,6 +187,19 @@ class RaspithermControlResource(Resource):
             except (TypeError, ValueError):
                 hw_temp_c_readable = "??"
 
+        # Freeze protection
+        freeze_protection_since = self.heating_controller.freeze_protection_active_since
+        if freeze_protection_since:
+            freeze_protection_active = 1
+            freeze_protection_style = ""
+            freeze_protection_since_readable = freeze_protection_since.strftime("%H:%M")
+        else:
+            freeze_protection_active = 0
+            freeze_protection_style = "display: none;"
+            freeze_protection_since_readable = ""
+        freeze_protection_target_temp_c = self.heating_controller.freeze_protection_target_temp_c
+        freeze_protection_target_temp_c_readable = "" if freeze_protection_target_temp_c is None else "{:.0f}".format(freeze_protection_target_temp_c)
+
         # Read our latest temperature target:
         target_temperature = self.heating_controller.get_data("target_temperature", default=None)
         try:
@@ -214,6 +227,9 @@ class RaspithermControlResource(Resource):
             "hw_temp_c": six.text_type(hw_temp_c),
             "target_temperature": target_temperature,
             "target_temperature_readable": target_temperature_readable,
+            "freeze_protection_active": freeze_protection_active,
+            "freeze_protection_since": freeze_protection_since_readable,
+            "freeze_protection_target_temp_c": freeze_protection_target_temp_c_readable,
             "debug": int(DEBUG)
         }
 
@@ -254,6 +270,10 @@ class RaspithermControlResource(Resource):
                 hw_temp_c_readable=hw_temp_c_readable,
                 target_temperature=target_temperature,
                 target_temperature_readable=target_temperature_readable,
+                freeze_protection_active=freeze_protection_active,
+                freeze_protection_style=freeze_protection_style,
+                freeze_protection_since=freeze_protection_since_readable,
+                freeze_protection_target_temp_c=freeze_protection_target_temp_c_readable,
             ).encode('utf-8')
     
     def action__hw(self, request):
@@ -292,6 +312,10 @@ class RaspithermControlResource(Resource):
         """
         if self.heating_controller.get_has_temp_humidity_sensor():
             self.heating_controller.read_temp_humidity(use_cache=True)
+            try:
+                self.heating_controller.update_freeze_protection()
+            except Exception as e:  # An exception here would stop the polling loop altogether
+                logging.exception("Freeze protection check failed: %s", e)
         if self.heating_controller.get_has_hw_temp_sensor():
             self.heating_controller.read_hw_temp()
             # TODO: implement target-temperature central heating control response.

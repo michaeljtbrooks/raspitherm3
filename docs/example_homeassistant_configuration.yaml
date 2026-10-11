@@ -64,6 +64,8 @@ sensor:
       - th_temp_f
       - th_humidity
       - th_style
+      - freeze_protection_active
+      - freeze_protection_since
     # If you wish to use Fahrenheit, swap th_temp_c to th_temp_f, then modify the raspitherm_temperature and thermostat_main temperatures below
     value_template: >- 
       {% if value_json.th_available %}

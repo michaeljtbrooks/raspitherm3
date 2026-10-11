@@ -47,6 +47,7 @@ DEFAULTS = {
         'hw_temp_sensor_pin': 0,
         'th_sensor_type': "DHT11",
         'th_sensor_power_pin': 0,
+        'freeze_protection_temp_c': 7,  # Turn heating on if room is below this. Set to 'off' to disable.
         'debug': 0  # Must be lower case!
 }
 
