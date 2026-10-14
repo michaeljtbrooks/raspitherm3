@@ -80,6 +80,8 @@ template:
     - name: raspitherm_temperature
       # If you wish to use Fahrenheit, swap th_temp_c with the th_temp_f attribute here.
       state: "{{ states.sensor.raspitherm_status.attributes.th_temp_c|float(19.9) }}"
+      # Raspitherm reports a placeholder th_temp_c of 20 when the sensor isn't responding. Show unavailable instead.
+      availability: "{{ state_attr('sensor.raspitherm_status', 'th_available')|int(0) == 1 }}"
 
 # Thermostat: https://www.home-assistant.io/integrations/generic_thermostat/
 climate:

@@ -210,12 +210,36 @@ class PiPinInterface(pigpio.pi, object):
         return supplementary_interface
 
 
+class SafeEdgeCallbackMixin(object):
+    """
+    pigpio_dht's _edge_callback() asserts on the final edge of each transmission, which a noisy line can fail.
+    pigpio runs every callback on a single notification thread with no exception handling, so one failed assert
+    kills that thread for good: no more edges get delivered, every read times out, and power cycling the sensor
+    can't fix it. Only restarting Raspitherm did. So never let an exception escape; just fail that one read.
+    """
+    def _edge_callback(self, gpio, level, tick):
+        try:
+            super(SafeEdgeCallbackMixin, self)._edge_callback(gpio, level, tick)
+        except Exception as e:
+            self.read_success = False  # read() will then raise TimeoutError, which our retry/reset logic handles
+            logging.warning("{}._edge_callback(): bad transmission on pin {}, edge {}, level {} ({}). Read discarded.".format(
+                self.__class__.__name__, gpio, self._edge_count, level, repr(e)))
+
+
+class SafeDHT11(SafeEdgeCallbackMixin, DHT11):
+    pass
+
+
+class SafeDHT22(SafeEdgeCallbackMixin, DHT22):
+    pass
+
+
 class TemperatureHumiditySensor(object):
     """
     Binds a temperature/humidity sensor
     Uses DHTXX class, which is an interface to pigpio.pi(). pigpio_interface keyword allows us to reuse objects.
     """
-    iface_class = DHT11
+    iface_class = SafeDHT11
     iface = None
     pigpio_interface = None
     gpio_pin = 20
@@ -246,10 +270,10 @@ class TemperatureHumiditySensor(object):
         """
         self.mode = mode
         if mode in (1, 11, "1", "11", "DHT11"):
-            self.iface_class = DHT11
+            self.iface_class = SafeDHT11
             self.lockout_secs = 10
         else:
-            self.iface_class = DHT22
+            self.iface_class = SafeDHT22
             self.lockout_secs = 5
         self.gpio_pin = gpio
         self.sensor_power_pin = sensor_power_pin or self.sensor_power_pin
